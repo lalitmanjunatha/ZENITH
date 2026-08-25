@@ -1,0 +1,44 @@
+Metadata-Version: 2.4
+Name: livekit-plugins-mistralai
+Version: 1.3.6
+Summary: LiveKit Agents Plugin for services from AWS
+Project-URL: Documentation, https://docs.livekit.io
+Project-URL: Website, https://livekit.io/
+Project-URL: Source, https://github.com/livekit/agents
+Author-email: LiveKit <hello@livekit.io>
+License-Expression: Apache-2.0
+Keywords: ai,audio,livekit,mistral,realtime,video,voice
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Topic :: Multimedia :: Sound/Audio
+Classifier: Topic :: Multimedia :: Video
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.9.0
+Requires-Dist: livekit-agents>=1.3.6
+Requires-Dist: livekit-plugins-openai>=1.2.5
+Requires-Dist: mistralai>=1.9.3
+Description-Content-Type: text/markdown
+
+# MistralAI Plugin for LiveKit Agents
+
+Support for MistralAI LLM, ChatModels
+
+See [https://docs.livekit.io/agents/integrations/mistral/](https://docs.livekit.io/agents/integrations/mistral/) for more information.
+
+## Installation
+
+```bash
+pip install livekit-plugins-mistral
+```
+
+## Pre-requisites
+
+You'll need an API key from MistralAI. It can be set as an environment variable:
+
+```bash
+export MISTRAL_API_KEY=your_api_key_here
+```

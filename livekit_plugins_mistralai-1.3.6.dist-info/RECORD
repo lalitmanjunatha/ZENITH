@@ -1,0 +1,17 @@
+livekit/plugins/mistralai/__init__.py,sha256=EzcQY8EhvtkvvTUN5eTp6crbM6UzA_-oeDGUKcP6WYo,596
+livekit/plugins/mistralai/__pycache__/__init__.cpython-311.pyc,,
+livekit/plugins/mistralai/__pycache__/llm.cpython-311.pyc,,
+livekit/plugins/mistralai/__pycache__/log.cpython-311.pyc,,
+livekit/plugins/mistralai/__pycache__/models.cpython-311.pyc,,
+livekit/plugins/mistralai/__pycache__/stt.cpython-311.pyc,,
+livekit/plugins/mistralai/__pycache__/version.cpython-311.pyc,,
+livekit/plugins/mistralai/llm.py,sha256=9hGI3hRJIpuu1DE6JmOg_wK618P7LwnumM3dlfybN3k,6234
+livekit/plugins/mistralai/log.py,sha256=31vE0bRm95sG0QS7n0Aavnzy7w6I1fbQCZ77NISSTCs,72
+livekit/plugins/mistralai/models.py,sha256=p7AOrvizeACL1nSgevbDQUM6_eL-hllLbqtMEp7TU_w,408
+livekit/plugins/mistralai/py.typed,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+livekit/plugins/mistralai/stt.py,sha256=ZmujBVVSTPnsrLnaxuBoTK1M8JKSoCeKkZSnEHHM3Ng,4154
+livekit/plugins/mistralai/version.py,sha256=ACxcDkY3wO-mujinC70O_2JdKxYjTo_xqigEGm67gdY,601
+livekit_plugins_mistralai-1.3.6.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+livekit_plugins_mistralai-1.3.6.dist-info/METADATA,sha256=NO7IuFA0F8WCyZrsXCgxskuz4mjAIhLU15lqo98sUnA,1484
+livekit_plugins_mistralai-1.3.6.dist-info/RECORD,,
+livekit_plugins_mistralai-1.3.6.dist-info/WHEEL,sha256=WLgqFyCfm_KASv4WHyYy0P3pM_m7J5L9k2skdKLirC8,87

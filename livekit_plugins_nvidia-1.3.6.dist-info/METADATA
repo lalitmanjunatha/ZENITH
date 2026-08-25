@@ -1,0 +1,42 @@
+Metadata-Version: 2.4
+Name: livekit-plugins-nvidia
+Version: 1.3.6
+Summary: LiveKit Agents Plugin for services from nvidia
+Project-URL: Documentation, https://docs.livekit.io
+Project-URL: Website, https://livekit.io/
+Project-URL: Source, https://github.com/livekit/agents
+Author-email: LiveKit <hello@livekit.io>
+License-Expression: Apache-2.0
+Keywords: audio,livekit,nvidia,realtime,video,webrtc
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Topic :: Multimedia :: Sound/Audio
+Classifier: Topic :: Multimedia :: Video
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.9.0
+Requires-Dist: livekit-agents>=1.3.6
+Requires-Dist: nvidia-riva-client
+Description-Content-Type: text/markdown
+
+# NVIDIA plugin for LiveKit Agents
+
+Support for [NVIDIA Riva](https://developer.nvidia.com/riva)'s speech AI services in LiveKit Agents.
+
+More information is available in the [NVIDIA Riva documentation](https://developer.nvidia.com/riva).
+
+## Installation
+
+```bash
+pip install livekit-plugins-nvidia
+```
+
+## Pre-requisites
+
+You can either:
+
+1. Use an API key from NVIDIA. It can be set as an environment variable: `NVIDIA_API_KEY`
+2. Use you self hosted [Nim](https://developer.nvidia.com/nim) server.

@@ -1,0 +1,29 @@
+{
+  "ts": "2026-08-23T19:42:55.091801",
+  "apps": [
+    "Brave",
+    "File Explorer"
+  ],
+  "clipboard": "",
+  "last_messages": [
+    {
+      "role": "user",
+      "text": "regression probe message"
+    },
+    {
+      "role": "user",
+      "text": "test dream msg 0 about dark mode preference"
+    },
+    {
+      "role": "assistant",
+      "text": "test dream msg 1 about dark mode preference"
+    },
+    {
+      "role": "user",
+      "text": "test dream msg 2 about dark mode preference"
+    }
+  ],
+  "focus": null,
+  "protocol": null,
+  "note": "mid-refactor test"
+}

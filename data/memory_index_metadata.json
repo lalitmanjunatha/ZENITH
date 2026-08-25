@@ -1,0 +1,169 @@
+[
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 0 about dark mode preference",
+    "message_id": 4,
+    "conv_id": 4,
+    "created_at": "2026-08-23T13:09:26.372680",
+    "vector_index": 0
+  },
+  {
+    "type": "message",
+    "role": "assistant",
+    "content": "test dream msg 1 about dark mode preference",
+    "message_id": 5,
+    "conv_id": 4,
+    "created_at": "2026-08-23T13:09:26.608799",
+    "vector_index": 1
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 2 about dark mode preference",
+    "message_id": 6,
+    "conv_id": 4,
+    "created_at": "2026-08-23T13:09:26.684598",
+    "vector_index": 2
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 0 about dark mode preference",
+    "message_id": 7,
+    "conv_id": 5,
+    "created_at": "2026-08-23T13:13:01.698246",
+    "vector_index": 3
+  },
+  {
+    "type": "message",
+    "role": "assistant",
+    "content": "test dream msg 1 about dark mode preference",
+    "message_id": 8,
+    "conv_id": 5,
+    "created_at": "2026-08-23T13:13:01.946501",
+    "vector_index": 4
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 2 about dark mode preference",
+    "message_id": 9,
+    "conv_id": 5,
+    "created_at": "2026-08-23T13:13:02.321632",
+    "vector_index": 5
+  },
+  {
+    "type": "fact",
+    "category": "preference",
+    "content": "Test user prefers dark mode",
+    "source": "consolidation",
+    "created_at": "2026-08-23T13:13:02.396649",
+    "vector_index": 6
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 0 about dark mode preference",
+    "message_id": 11,
+    "conv_id": 7,
+    "created_at": "2026-08-23T14:27:44.819483",
+    "vector_index": 7
+  },
+  {
+    "type": "message",
+    "role": "assistant",
+    "content": "test dream msg 1 about dark mode preference",
+    "message_id": 12,
+    "conv_id": 7,
+    "created_at": "2026-08-23T14:27:44.920066",
+    "vector_index": 8
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 2 about dark mode preference",
+    "message_id": 13,
+    "conv_id": 7,
+    "created_at": "2026-08-23T14:27:44.983967",
+    "vector_index": 9
+  },
+  {
+    "type": "fact",
+    "category": "preference",
+    "content": "Test user prefers dark mode",
+    "source": "consolidation",
+    "created_at": "2026-08-23T14:27:45.045859",
+    "vector_index": 10
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 0 about dark mode preference",
+    "message_id": 15,
+    "conv_id": 9,
+    "created_at": "2026-08-23T16:20:21.761124",
+    "vector_index": 11
+  },
+  {
+    "type": "message",
+    "role": "assistant",
+    "content": "test dream msg 1 about dark mode preference",
+    "message_id": 16,
+    "conv_id": 9,
+    "created_at": "2026-08-23T16:20:22.069439",
+    "vector_index": 12
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 2 about dark mode preference",
+    "message_id": 17,
+    "conv_id": 9,
+    "created_at": "2026-08-23T16:20:22.153202",
+    "vector_index": 13
+  },
+  {
+    "type": "fact",
+    "category": "preference",
+    "content": "Test user prefers dark mode",
+    "source": "consolidation",
+    "created_at": "2026-08-23T16:20:22.227198",
+    "vector_index": 14
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 0 about dark mode preference",
+    "message_id": 19,
+    "conv_id": 11,
+    "created_at": "2026-08-23T16:22:38.526929",
+    "vector_index": 15
+  },
+  {
+    "type": "message",
+    "role": "assistant",
+    "content": "test dream msg 1 about dark mode preference",
+    "message_id": 20,
+    "conv_id": 11,
+    "created_at": "2026-08-23T16:22:38.683315",
+    "vector_index": 16
+  },
+  {
+    "type": "message",
+    "role": "user",
+    "content": "test dream msg 2 about dark mode preference",
+    "message_id": 21,
+    "conv_id": 11,
+    "created_at": "2026-08-23T16:22:38.757693",
+    "vector_index": 17
+  },
+  {
+    "type": "fact",
+    "category": "preference",
+    "content": "Test user prefers dark mode",
+    "source": "consolidation",
+    "created_at": "2026-08-23T16:22:38.835161",
+    "vector_index": 18
+  }
+]

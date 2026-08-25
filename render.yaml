@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: zenith-cloud-brain
+    runtime: docker
+    plan: free
+    dockerfilePath: ./cloud/Dockerfile
+    dockerContext: ./cloud
+    healthCheckPath: /api/ping
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: BRIDGE_PIN
+        sync: false

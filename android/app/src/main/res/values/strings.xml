@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Zenith Phone</string>
+
+    <string name="status_default_dialer">Default dialer</string>
+    <string name="status_not_default_dialer">Not default dialer</string>
+    <string name="action_make_default">Make default dialer</string>
+    <string name="action_grant_permissions">Grant permissions</string>
+
+    <string name="call_from">Incoming call from</string>
+    <string name="call_unknown">Unknown</string>
+    <string name="action_answer">Answer</string>
+    <string name="action_decline">Decline</string>
+    <string name="action_decline_sms">Decline + SMS</string>
+    <string name="action_ai">Let AI talk</string>
+    <string name="action_take_over">Take over</string>
+    <string name="ai_thinking">AI is handling this call\u2026</string>
+    <string name="ai_error">AI unavailable — declined</string>
+</resources>

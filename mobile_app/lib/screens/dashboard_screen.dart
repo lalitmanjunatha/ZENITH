@@ -3,6 +3,7 @@ import 'dart:async';
 import '../theme/jarvis_theme.dart';
 import '../services/bridge_service.dart';
 import '../services/speech_service.dart';
+import '../services/phone_tools.dart';
 import '../widgets/mic_button.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -157,6 +158,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             SizedBox(height: 20),
           ],
           if (widget.online && !widget.bridge.useCloud) _buildQuickActions(),
+          SizedBox(height: 8),
+          _buildPhoneActions(),
           if (widget.bridge.useCloud && widget.bridge.pinConfigured) ...[
             SizedBox(height: 12),
             Center(
@@ -186,6 +189,94 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ],
       ),
+    );
+  }
+
+  final PhoneTools _phone = PhoneTools();
+  bool _torch = false;
+
+  void _runPhoneTool(String label, Future<String> Function() fn) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('$label…'),
+      backgroundColor: JTheme.surface,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 1),
+    ));
+    fn().then((r) {
+      if (mounted) _showBrainReply(r);
+    });
+  }
+
+  Widget _buildPhoneActions() {
+    Widget chip(String label, IconData icon, VoidCallback onTap) =>
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+            decoration: JTheme.glassCard(),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: JTheme.cyan, size: 20),
+                const SizedBox(height: 6),
+                Text(label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: JTheme.textSecondary, fontSize: 10)),
+              ],
+            ),
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('PHONE AI — RUNS ON THIS DEVICE',
+            style: TextStyle(
+                color: JTheme.textMuted,
+                fontSize: 11,
+                letterSpacing: 1.5)),
+        const SizedBox(height: 10),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 4,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 1.05,
+          children: [
+            chip('Flashlight', Icons.flashlight_on, () {
+              _torch = !_torch;
+              _runPhoneTool('Torch ${_torch ? "ON" : "OFF"}',
+                  () => _phone.execute('phone_flashlight', {'on': _torch}));
+            }),
+            chip('Battery', Icons.battery_5_bar,
+                () => _runPhoneTool('Checking battery',
+                    () => _phone.execute('phone_battery', {}))),
+            chip('Location', Icons.location_on_outlined,
+                () => _runPhoneTool('Getting GPS fix',
+                    () => _phone.execute('phone_location', {}))),
+            chip('Wi-Fi', Icons.wifi,
+                () => _runPhoneTool('Reading Wi-Fi',
+                    () => _phone.execute('phone_wifi_status', {}))),
+            chip('Vibrate', Icons.vibration,
+                () => _runPhoneTool('Vibrating',
+                    () => _phone.execute('phone_vibrate', {}))),
+            chip('Selfie', Icons.photo_camera_outlined,
+                () => _runPhoneTool('Opening front camera',
+                    () => _phone.execute('phone_selfie', {}))),
+            chip('Storage', Icons.storage_outlined,
+                () => _runPhoneTool('Reading storage',
+                    () => _phone.execute('phone_storage_stats', {}))),
+            chip('Speak test', Icons.record_voice_over_outlined,
+                () => _runPhoneTool('Speaking',
+                    () => _phone.execute(
+                        'phone_tts_speak',
+                        {'text': 'Zenith phone systems online.'}))),
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 

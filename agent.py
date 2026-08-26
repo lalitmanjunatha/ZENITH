@@ -833,6 +833,9 @@ async def entrypoint(ctx: agents.JobContext):
     # Cross-device bridge server (phone connects here)
     asyncio.create_task(start_bridge_server(agent, session))
 
+    # Cloud link daemon (laptop dials OUT to render.com; no port forwarding)
+    asyncio.create_task(_spawn_cloud_client())
+
     # JARVIS cinematic boot (voice) — falls back to standard greeting
     try:
         from Tools.boot_sequence import run_boot
@@ -1143,6 +1146,28 @@ def _run_light_index(agent):
         print(f"📁 Light index pass complete: {result}")
     except Exception as e:
         print(f"⚠️ Light index worker failed: {e}")
+
+
+async def _spawn_cloud_client():
+    """Launch cloud/laptop_client.py as a child process when configured."""
+    url = os.environ.get("ZENITH_CLOUD_URL", "").strip()
+    pin = os.environ.get("BRIDGE_PIN", "").strip()
+    if not url or not pin:
+        logger.warning(
+            "Zenith Cloud disabled - set ZENITH_CLOUD_URL and BRIDGE_PIN in .env"
+        )
+        return
+    root = Path(__file__).resolve().parent
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            os.sys.executable, str(root / "cloud" / "laptop_client.py"),
+            cwd=str(root),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        logger.info("Zenith Cloud daemon started (pid %s) -> %s", proc.pid, url)
+    except Exception as e:
+        logger.error("Failed to start Zenith Cloud daemon: %s", e)
 
 
 async def _auto_index_files(agent):

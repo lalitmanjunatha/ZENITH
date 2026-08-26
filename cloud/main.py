@@ -135,7 +135,7 @@ class CommandIn(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"service": "zenith-cloud-brain", "status": "alive"}
+    return {"service": "zenith-cloud-brain", "status": "alive", "version": "stats-1"}
 
 
 @app.get("/api/ping")

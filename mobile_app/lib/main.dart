@@ -7,6 +7,7 @@ import 'services/phone_link.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/command_screen.dart';
 import 'screens/settings_screen.dart';
+import 'widgets/toast_host.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,39 +64,13 @@ class _HomeShellState extends State<HomeShell> {
     _connSub = bridge.connectionStream.listen((online) {
       setState(() => laptopOnline = online);
       if (online) {
-        _showLaptopOnlineSnackBar();
+        ZenithToasts.success('Your laptop just came ONLINE!',
+            duration: const Duration(seconds: 4));
       }
     });
     bridge.ping().then((v) {
       if (mounted) setState(() => laptopOnline = v);
     });
-  }
-
-  void _showLaptopOnlineSnackBar() {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.laptop_windows, color: JTheme.green),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Your laptop just came online!',
-                style: TextStyle(color: JTheme.textPrimary),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: JTheme.surface,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: JTheme.green.withOpacity(0.4)),
-        ),
-        duration: Duration(seconds: 4),
-      ),
-    );
   }
 
   @override
@@ -110,7 +85,12 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
         child: SafeArea(
-          child: _buildBody(),
+          child: Stack(
+            children: [
+              _buildBody(),
+              const ZenithToastHost(),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: _buildBottomNav(),

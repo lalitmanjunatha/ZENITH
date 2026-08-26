@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/jarvis_theme.dart';
 import '../services/bridge_service.dart';
+import '../widgets/toast_host.dart';
 
 class SettingsScreen extends StatefulWidget {
   final BridgeService bridge;
@@ -54,11 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     setState(() => _savedMsg =
         'Saved · Mode: ${_useCloud ? "CLOUD ☁️" : "LAN 💻"}${_useCloud && pinVal.isEmpty ? " (PIN missing!)" : ""}');
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(_savedMsg),
-      backgroundColor: JTheme.surface,
-      behavior: SnackBarBehavior.floating,
-    ));
+    ZenithToasts.success(_savedMsg);
   }
 
   @override

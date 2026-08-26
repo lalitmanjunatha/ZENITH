@@ -6,6 +6,7 @@ import '../services/speech_service.dart';
 import '../services/phone_tools.dart';
 import '../services/wake_word_service.dart';
 import '../widgets/mic_button.dart';
+import '../widgets/toast_host.dart';
 
 class DashboardScreen extends StatefulWidget {
   final BridgeService bridge;
@@ -48,65 +49,33 @@ class _DashboardScreenState extends State<DashboardScreen>
     final prev = _lastLaptopOnline;
     _lastLaptopOnline = online;
     if (prev == null || prev == online) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(online ? Icons.laptop_windows : Icons.laptop_mac,
-            color: online ? JTheme.green : JTheme.red, size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Text(online ? 'Laptop just came ONLINE' : 'Laptop went offline',
-                style: TextStyle(color: JTheme.textPrimary, fontSize: 13))),
-      ]),
-      backgroundColor: JTheme.surface,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 3),
-    ));
+    ZenithToasts.success(online
+        ? 'Your laptop just came ONLINE!'
+        : 'Your laptop just went offline');
   }
 
   void _onVoiceCommand(String command) {
     if (command.isEmpty) return;
-
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(
-        content: Row(children: [
-          SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: JTheme.cyan)),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text('ZENITH thinking about "$command"…',
-                  style:
-                      TextStyle(color: JTheme.textPrimary, fontSize: 13))),
-        ]),
-        backgroundColor: JTheme.surface,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 45),
-      ));
+    ZenithToasts.clear();
+    ZenithToasts.info('ZENITH thinking about "$command"…',
+        duration: const Duration(seconds: 45));
 
     widget.bridge.askBrain(command).then((reply) async {
       if (!mounted) return;
       if (reply.type == 'confirm' && reply.session != null) {
-        ScaffoldMessenger.of(context).clearSnackBars();
+        ZenithToasts.clear();
         final yes = await _askConfirmDialog(reply.reply);
         final answer = yes ? 'yes do it' : 'no cancel';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(yes ? '▶️ Running on laptop…' : '🚫 Cancelled'),
-          backgroundColor: JTheme.surface,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 45),
-        ));
+        ZenithToasts.success(yes ? '▶️ Running on laptop…' : '🚫 Cancelled');
         final finalReply =
             await widget.bridge.respondConfirm(reply.session!, answer);
         if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
+          ZenithToasts.clear();
           _showBrainReply(finalReply.reply);
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
+          ZenithToasts.clear();
           _showBrainReply(reply.reply);
         }
       }
@@ -127,12 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       ));
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(text),
-      backgroundColor: JTheme.card,
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 6),
-    ));
+    ZenithToasts.info(text, duration: const Duration(seconds: 6));
   }
 
   Future<bool> _askConfirmDialog(String question) async {
@@ -224,12 +188,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _wakeOn = false;
 
   void _runPhoneTool(String label, Future<String> Function() fn) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$label…'),
-      backgroundColor: JTheme.surface,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 1),
-    ));
+    ZenithToasts.info('$label…', duration: const Duration(seconds: 1));
     fn().then((r) {
       if (mounted) _showBrainReply(r);
     });
@@ -250,12 +209,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (!mounted) return;
       _phone.execute('phone_tts_speak',
           {'text': kw.contains('HEY') ? 'Yes?' : 'Listening'});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('🎙 Wake word detected ($kw) — speak your command'),
-        backgroundColor: JTheme.surface,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ));
+      ZenithToasts.success('🎙 Wake word detected ($kw) — speak your command',
+          duration: const Duration(seconds: 3));
     };
     _wake.start();
     if (mounted) {
@@ -613,11 +568,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _run(String tool, [Map<String, dynamic>? args]) async {
     final result = await widget.bridge.runCommand(tool, args: args);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.length > 200 ? result.substring(0, 200) + '…' : result),
-        backgroundColor: JTheme.surface,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ZenithToasts.info(
+        result.length > 200 ? result.substring(0, 200) + '…' : result,
+      );
     }
   }
 }

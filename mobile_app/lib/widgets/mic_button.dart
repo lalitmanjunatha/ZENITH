@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/jarvis_theme.dart';
 import '../services/speech_service.dart';
+import '../widgets/toast_host.dart';
 
 /// Big glowing mic button — press to speak, release to send command.
 /// Shows pulsing rings while listening, recognized text below.
@@ -77,12 +78,7 @@ class _MicButtonState extends State<MicButton>
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: JTheme.surface,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 3),
-    ));
+    ZenithToasts.info(msg, duration: const Duration(seconds: 3));
   }
 
   @override

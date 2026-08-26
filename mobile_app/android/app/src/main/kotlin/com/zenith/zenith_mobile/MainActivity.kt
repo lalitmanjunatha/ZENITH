@@ -18,11 +18,15 @@ import android.os.StatFs
 import android.provider.CallLog
 import android.provider.CalendarContract
 import android.provider.Telephony
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.telephony.SmsManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
@@ -42,6 +46,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
+
                 try {
                     when (call.method) {
                         "requestPermissions" -> requestPerms(call.arguments, result)
@@ -88,6 +93,67 @@ class MainActivity : FlutterActivity() {
                     result.error("NATIVE_ERR", e.message ?: e.toString(), null)
                 }
             }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, "zenith_pcm")
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(args: Any?, events: EventChannel.EventSink?) {
+                    if (events == null) return
+                    val sr = ((args as? Map<*, *>)?.get("sampleRate") as? Number)
+                        ?.toInt() ?: 16000
+                    startPcm(sr, events)
+                }
+
+                override fun onCancel(args: Any?) {
+                    stopPcm()
+                }
+            })
+    }
+
+    private var audioRecord: AudioRecord? = null
+    private var pcmThread: Thread? = null
+
+    @Suppress("MissingPermission")
+    private fun startPcm(sampleRate: Int, events: EventChannel.EventSink) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            events.error("perm", "RECORD_AUDIO permission not granted", null)
+            return
+        }
+        stopPcm()
+        val minBuf = AudioRecord.getMinBufferSize(
+            sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        audioRecord = AudioRecord(
+            MediaRecorder.AudioSource.MIC, sampleRate,
+            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+            maxOf(minBuf, 8192))
+        audioRecord?.startRecording()
+        pcmThread = Thread {
+            val buf = ByteArray(3200)
+            while (!Thread.currentThread().isInterrupted) {
+                val rec = audioRecord ?: break
+                if (rec.recordingState != AudioRecord.RECORDSTATE_RECORDING) break
+                val n = rec.read(buf, 0, buf.size)
+                if (n <= 0) break
+                try {
+                    events.success(java.util.Arrays.copyOf(buf, n))
+                } catch (_: Exception) {
+                    break
+                }
+            }
+        }.also { it.start() }
+    }
+
+    private fun stopPcm() {
+        pcmThread?.interrupt()
+        pcmThread = null
+        try {
+            audioRecord?.stop()
+        } catch (_: Exception) {}
+        try {
+            audioRecord?.release()
+        } catch (_: Exception) {}
+        audioRecord = null
     }
 
     private fun json(a: JSONObject): Map<String, Any?> {

@@ -12,6 +12,7 @@ class SpeechService {
   bool get isAvailable => _available;
   String get lastWords => _lastWords;
   String lastError = '';
+  Function? onStopped;
 
   /// Initialize. Call once at app startup. Returns true if mic available.
   Future<bool> init() async {
@@ -20,10 +21,12 @@ class SpeechService {
         onError: (e) {
           _listening = false;
           lastError = e.errorMsg ?? 'speech error';
+          onStopped?.call();
         },
         onStatus: (status) {
           if (status == 'done' || status == 'notListening') {
             _listening = false;
+            onStopped?.call();
           }
         },
       );
@@ -77,6 +80,7 @@ class SpeechService {
         stop();
         if (_lastWords.isNotEmpty) onResult(_lastWords);
         _listening = false;
+        onStopped?.call();
       }
     });
   }

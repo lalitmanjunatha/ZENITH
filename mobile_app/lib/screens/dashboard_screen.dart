@@ -4,6 +4,7 @@ import '../theme/jarvis_theme.dart';
 import '../services/bridge_service.dart';
 import '../services/speech_service.dart';
 import '../services/phone_tools.dart';
+import '../services/wake_word_service.dart';
 import '../widgets/mic_button.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -65,33 +66,58 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _onVoiceCommand(String command) {
     if (command.isEmpty) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('🎙 "$command"'),
-      backgroundColor: JTheme.surface,
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(seconds: 2),
-    ));
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(
+        content: Row(children: [
+          SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: JTheme.cyan)),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text('ZENITH thinking about "$command"…',
+                  style:
+                      TextStyle(color: JTheme.textPrimary, fontSize: 13))),
+        ]),
+        backgroundColor: JTheme.surface,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 45),
+      ));
 
     widget.bridge.askBrain(command).then((reply) async {
       if (!mounted) return;
       if (reply.type == 'confirm' && reply.session != null) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         final yes = await _askConfirmDialog(reply.reply);
         final answer = yes ? 'yes do it' : 'no cancel';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(yes ? '▶️ Running on laptop…' : '🚫 Cancelled'),
           backgroundColor: JTheme.surface,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 45),
         ));
-        final finalReply = await widget.bridge.respondConfirm(reply.session!, answer);
-        if (mounted) _showBrainReply(finalReply.reply);
+        final finalReply =
+            await widget.bridge.respondConfirm(reply.session!, answer);
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          _showBrainReply(finalReply.reply);
+        }
       } else {
-        _showBrainReply(reply.reply);
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          _showBrainReply(reply.reply);
+        }
       }
     });
   }
 
   void _showBrainReply(String text) {
     if (!mounted) return;
+    if (_wakeOn && text.length <= 160) {
+      _phone.execute('phone_tts_speak', {'text': text});
+    }
     if (text.length > 220) {
       showDialog(context: context, builder: (_) => AlertDialog(
         backgroundColor: JTheme.card,
@@ -193,7 +219,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   final PhoneTools _phone = PhoneTools();
+  final WakeWordService _wake = WakeWordService();
   bool _torch = false;
+  bool _wakeOn = false;
 
   void _runPhoneTool(String label, Future<String> Function() fn) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -205,6 +233,74 @@ class _DashboardScreenState extends State<DashboardScreen>
     fn().then((r) {
       if (mounted) _showBrainReply(r);
     });
+  }
+
+  Future<void> _toggleWake() async {
+    if (_wakeOn) {
+      _wake.stop();
+      setState(() => _wakeOn = false);
+      return;
+    }
+    final ok = await _wake.init();
+    if (!ok) {
+      _showBrainReply('Wake word engine failed to load.');
+      return;
+    }
+    _wake.onWake = (kw) {
+      if (!mounted) return;
+      _phone.execute('phone_tts_speak',
+          {'text': kw.contains('HEY') ? 'Yes?' : 'Listening'});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('🎙 Wake word detected ($kw) — speak your command'),
+        backgroundColor: JTheme.surface,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ));
+    };
+    _wake.start();
+    if (mounted) {
+      setState(() => _wakeOn = _wake.isRunning);
+      _showBrainReply(_wake.isRunning
+          ? 'Always-listening ON - say "ZENITH" anytime.'
+          : 'Mic stream unavailable for wake mode.');
+    }
+  }
+
+  Widget _buildWakeToggle() {
+    return InkWell(
+      onTap: _toggleWake,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        decoration: BoxDecoration(
+          color: _wakeOn
+              ? JTheme.cyan.withOpacity(0.15)
+              : JTheme.card.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color:
+                  (_wakeOn ? JTheme.cyan : JTheme.border).withOpacity(0.4)),
+        ),
+        child: Row(children: [
+          Icon(_wakeOn ? Icons.graphic_eq : Icons.mic_none,
+              color: _wakeOn ? JTheme.cyan : JTheme.textMuted, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _wakeOn
+                  ? 'ALWAYS-LISTENING ON - say "ZENITH"'
+                  : 'Enable always-listening ("ZENITH")',
+              style: TextStyle(
+                  color: _wakeOn ? JTheme.cyan : JTheme.textSecondary,
+                  fontSize: 11),
+            ),
+          ),
+          Icon(Icons.power_settings_new,
+              size: 16,
+              color: _wakeOn ? JTheme.green : JTheme.textMuted),
+        ]),
+      ),
+    );
   }
 
   Widget _buildPhoneActions() {
@@ -237,6 +333,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 fontSize: 11,
                 letterSpacing: 1.5)),
         const SizedBox(height: 10),
+        _buildWakeToggle(),
+        const SizedBox(height: 12),
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),

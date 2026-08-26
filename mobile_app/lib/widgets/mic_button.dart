@@ -33,18 +33,26 @@ class _MicButtonState extends State<MicButton>
       duration: Duration(milliseconds: 1200),
     )..repeat();
     widget.speech.init();
+    widget.speech.onStopped = _finalize;
+  }
+
+  void _finalize() {
+    if (!mounted) return;
+    if (!_listening) return;
+    setState(() { _listening = false; });
+    if (_recognizedText.trim().isNotEmpty) {
+      final cmd = _recognizedText.trim();
+      _recognizedText = '';
+      widget.onCommand(cmd);
+    } else {
+      _snack("Didn't catch that — try again, a bit louder");
+    }
   }
 
   Future<void> _toggleMic() async {
     if (_listening) {
       await widget.speech.stop();
-      setState(() { _listening = false; });
-      if (_recognizedText.isNotEmpty) {
-        widget.onCommand(_recognizedText);
-        _recognizedText = '';
-      } else {
-        _snack("Didn't catch that — try again, a bit louder");
-      }
+      _finalize();
       return;
     }
 

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/jarvis_theme.dart';
 import 'services/bridge_service.dart';
+import 'services/phone_link.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/command_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(ZenithMobileApp());
 }
 
@@ -30,22 +33,42 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
   late BridgeService bridge;
+  PhoneLink? phoneLink;
   bool laptopOnline = false;
   StreamSubscription? _connSub;
 
   @override
   void initState() {
     super.initState();
-    bridge = BridgeService(host: '192.168.1.100'); // TODO: make configurable
-    bridge.startPolling(intervalSec: 8);
+    _initBridge();
+  }
+
+  Future<void> _initBridge() async {
+    final prefs = await SharedPreferences.getInstance();
+    bridge = BridgeService(
+      host: prefs.getString('laptop_host') ?? '192.168.1.100',
+    );
+    final useCloudPref = prefs.getBool('zenith_use_cloud') ?? true;
+    final cloudUrl =
+        prefs.getString('zenith_cloud_url') ?? 'https://zenith-cloud-brain.onrender.com';
+    final savedPin = prefs.getString('zenith_pin') ?? '';
+    if (useCloudPref && cloudUrl.isNotEmpty) {
+      bridge.configureCloud(url: cloudUrl, pinValue: savedPin);
+    }
+    phoneLink?.dispose();
+    if (useCloudPref && cloudUrl.isNotEmpty && savedPin.isNotEmpty) {
+      phoneLink = PhoneLink(cloudUrl: cloudUrl, pin: savedPin)..connect();
+    }
+    bridge.startPolling(intervalSec: bridge.useCloud ? 15 : 8);
     _connSub = bridge.connectionStream.listen((online) {
       setState(() => laptopOnline = online);
       if (online) {
         _showLaptopOnlineSnackBar();
       }
     });
-    // Initial check
-    bridge.ping().then((v) => setState(() => laptopOnline = v));
+    bridge.ping().then((v) {
+      if (mounted) setState(() => laptopOnline = v);
+    });
   }
 
   void _showLaptopOnlineSnackBar() {
@@ -131,6 +154,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _connSub?.cancel();
+    phoneLink?.dispose();
     bridge.dispose();
     super.dispose();
   }

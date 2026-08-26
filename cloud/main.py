@@ -34,6 +34,7 @@ class Hub:
         self.laptop: Optional[WebSocket] = None
         self.laptop_last_seen: float = 0.0
         self.phone_last_seen: float = 0.0
+        self.laptop_stats: dict = {}
 
     def laptop_status(self) -> dict:
         online = self.laptop is not None
@@ -151,6 +152,7 @@ async def status(pin: str = ""):
         "phone_connected": HUB.phone is not None,
         "pending_confirmations": len(PENDING),
         "phone_tools": len(PHONE_TOOLS),
+        "stats": HUB.laptop_stats,
     }
 
 
@@ -272,7 +274,9 @@ async def ws_endpoint(ws: WebSocket, role: str = "phone", pin: str = ""):
                 HUB.laptop_last_seen = time.time()
             else:
                 HUB.phone_last_seen = time.time()
-            if mtype == "result":
+            if mtype == "heartbeat" and isinstance(data.get("stats"), dict):
+                HUB.laptop_stats = data["stats"]
+            elif mtype == "result":
                 RESULTS[data.get("req_id", "")] = {
                     "ok": data.get("ok", False),
                     "output": data.get("output", ""),

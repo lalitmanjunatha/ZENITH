@@ -42,8 +42,18 @@ class _MicButtonState extends State<MicButton>
       if (_recognizedText.isNotEmpty) {
         widget.onCommand(_recognizedText);
         _recognizedText = '';
+      } else {
+        _snack("Didn't catch that — try again, a bit louder");
       }
       return;
+    }
+
+    if (!widget.speech.isAvailable) {
+      final ok = await widget.speech.init();
+      if (!ok) {
+        _snack('Speech recognition unavailable: ${widget.speech.lastError}');
+        return;
+      }
     }
 
     // Start listening
@@ -56,6 +66,15 @@ class _MicButtonState extends State<MicButton>
         if (mounted) setState(() => _recognizedText = partial);
       },
     );
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: JTheme.surface,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 3),
+    ));
   }
 
   @override

@@ -93,9 +93,18 @@ async def handle(ws):
 
 
 async def heartbeat(ws):
+    from Tools.device_bridge import system_stats
     while True:
         await asyncio.sleep(20)
-        await ws.send(json.dumps({"type": "heartbeat"}))
+        payload = {"type": "heartbeat"}
+        try:
+            payload["stats"] = await asyncio.to_thread(system_stats)
+        except Exception as e:
+            payload["stats_error"] = str(e)[:120]
+        try:
+            await ws.send(json.dumps(payload))
+        except Exception:
+            return
 
 
 async def session():

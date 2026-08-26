@@ -11,20 +11,27 @@ class SpeechService {
   bool get isListening => _listening;
   bool get isAvailable => _available;
   String get lastWords => _lastWords;
+  String lastError = '';
 
   /// Initialize. Call once at app startup. Returns true if mic available.
   Future<bool> init() async {
     try {
       _available = await _speech.initialize(
-        onError: (e) { _listening = false; },
+        onError: (e) {
+          _listening = false;
+          lastError = e.errorMsg ?? 'speech error';
+        },
         onStatus: (status) {
           if (status == 'done' || status == 'notListening') {
             _listening = false;
           }
         },
       );
+      if (!_available) lastError = 'Speech service unavailable on this device';
       return _available;
-    } catch (_) {
+    } catch (e) {
+      _available = false;
+      lastError = e.toString();
       return false;
     }
   }
@@ -35,7 +42,11 @@ class SpeechService {
     required Function(String) onResult,
     Function(String)? onPartialResult,
   }) async {
-    if (!_available || _listening) return;
+    if (!_available) {
+      final ok = await init();
+      if (!ok) return;
+    }
+    if (_listening) return;
     _lastWords = '';
     _listening = true;
 

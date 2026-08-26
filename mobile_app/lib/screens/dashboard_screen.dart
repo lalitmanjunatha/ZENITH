@@ -29,16 +29,41 @@ class _DashboardScreenState extends State<DashboardScreen>
       duration: Duration(seconds: 2),
     )..repeat(reverse: true);
     _statusSub = widget.bridge.statusStream.listen((data) {
-      if (mounted) setState(() => stats = data);
+      if (!mounted) return;
+      setState(() => stats = data);
+      _checkLaptopTransition(data);
     });
     _speech = SpeechService();
     _speech.init();
   }
 
-  void _onVoiceCommand(String command) {
-    if (!widget.online || command.isEmpty) return;
+  bool? _lastLaptopOnline;
 
-    // Show what was recognized
+  void _checkLaptopTransition(Map<String, dynamic> data) {
+    final cloud = data['_cloud'] as Map?;
+    final online =
+        ((cloud?['laptop'] as Map?)?['online'] == true);
+    final prev = _lastLaptopOnline;
+    _lastLaptopOnline = online;
+    if (prev == null || prev == online) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        Icon(online ? Icons.laptop_windows : Icons.laptop_mac,
+            color: online ? JTheme.green : JTheme.red, size: 18),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(online ? 'Laptop just came ONLINE' : 'Laptop went offline',
+                style: TextStyle(color: JTheme.textPrimary, fontSize: 13))),
+      ]),
+      backgroundColor: JTheme.surface,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
+  void _onVoiceCommand(String command) {
+    if (command.isEmpty) return;
+
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text('🎙 "$command"'),
       backgroundColor: JTheme.surface,
@@ -46,31 +71,67 @@ class _DashboardScreenState extends State<DashboardScreen>
       duration: Duration(seconds: 2),
     ));
 
-    // Map and execute
-    final mapped = _mapCommand(command);
-    widget.bridge.runCommand(mapped['tool'] as String,
-        args: mapped['args'] as Map<String, dynamic>?).then((result) {
-      if (mounted) {
+    widget.bridge.askBrain(command).then((reply) async {
+      if (!mounted) return;
+      if (reply.type == 'confirm' && reply.session != null) {
+        final yes = await _askConfirmDialog(reply.reply);
+        final answer = yes ? 'yes do it' : 'no cancel';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(result.length > 150 ? result.substring(0, 150) + '…' : result),
-          backgroundColor: JTheme.card,
+          content: Text(yes ? '▶️ Running on laptop…' : '🚫 Cancelled'),
+          backgroundColor: JTheme.surface,
           behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 4),
         ));
+        final finalReply = await widget.bridge.respondConfirm(reply.session!, answer);
+        if (mounted) _showBrainReply(finalReply.reply);
+      } else {
+        _showBrainReply(reply.reply);
       }
     });
   }
 
-  Map<String, dynamic> _mapCommand(String input) {
-    final l = input.toLowerCase().trim();
-    if (l.contains('health')) return {'tool': 'get_laptop_health', 'args': <String,dynamic>{}};
-    if (l.contains('threat') || l.contains('risk')) return {'tool': 'daily_threat_board', 'args': <String,dynamic>{}};
-    if (l.contains('damage')) return {'tool': 'damage_report', 'args': <String,dynamic>{}};
-    if (l.contains('battery')) return {'tool': 'battery_coach', 'args': <String,dynamic>{}};
-    if (l.contains('clean slate')) return {'tool': 'run_protocol', 'args': <String,dynamic>{'name':'clean slate'}};
-    if (l.contains('study mode')) return {'tool': 'run_protocol', 'args': <String,dynamic>{'name':'study mode'}};
-    if (l.contains('catch me up')) return {'tool': 'catch_me_up', 'args': <String,dynamic>{}};
-    return {'tool': 'decide_and_act', 'args': <String,dynamic>{'goal': input}};
+  void _showBrainReply(String text) {
+    if (!mounted) return;
+    if (text.length > 220) {
+      showDialog(context: context, builder: (_) => AlertDialog(
+        backgroundColor: JTheme.card,
+        title: Text('ZENITH', style: TextStyle(color: JTheme.cyan, fontSize: 16)),
+        content: SingleChildScrollView(child: Text(text, style: TextStyle(color: JTheme.textPrimary))),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('OK', style: TextStyle(color: JTheme.cyan)))],
+      ));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(text),
+      backgroundColor: JTheme.card,
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 6),
+    ));
+  }
+
+  Future<bool> _askConfirmDialog(String question) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: JTheme.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: JTheme.cyan.withOpacity(0.4))),
+        title: Row(children: [
+          Icon(Icons.laptop_windows, color: JTheme.cyan, size: 20),
+          SizedBox(width: 8),
+          Text('Laptop Tool', style: TextStyle(color: JTheme.cyan, fontSize: 15)),
+        ]),
+        content: Text(question, style: TextStyle(color: JTheme.textPrimary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: Text('No', style: TextStyle(color: JTheme.textMuted))),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: JTheme.cyan, foregroundColor: JTheme.bg),
+              child: Text('Yes, run it')),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override
@@ -91,25 +152,45 @@ class _DashboardScreenState extends State<DashboardScreen>
           SizedBox(height: 20),
           _buildStatusCard(),
           SizedBox(height: 20),
-          if (widget.online) ...[
+          if (_hasStats()) ...[
             _buildStatsGrid(),
             SizedBox(height: 20),
-            _buildQuickActions(),
-            SizedBox(height: 24),
-            // VOICE COMMAND BUTTON
+          ],
+          if (widget.online && !widget.bridge.useCloud) _buildQuickActions(),
+          if (widget.bridge.useCloud && widget.bridge.pinConfigured) ...[
+            SizedBox(height: 12),
             Center(
-              child: MicButton(
-                speech: _speech,
-                onCommand: _onVoiceCommand,
-                laptopOnline: widget.online,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: JTheme.surface.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: JTheme.cyan.withOpacity(0.25)),
+                ),
+                child: Text(
+                  widget.online
+                      ? '☁️ Brain · 💻 Laptop ONLINE'
+                      : '☁️ Brain · 💻 Laptop offline',
+                  style: TextStyle(color: JTheme.textMuted, fontSize: 11),
+                ),
               ),
             ),
-          ] else
-            _buildOfflineMessage(),
+          ],
+          SizedBox(height: 24),
+          Center(
+            child: MicButton(
+              speech: _speech,
+              onCommand: _onVoiceCommand,
+              laptopOnline: true,
+            ),
+          ),
         ],
       ),
     );
   }
+
+  bool _hasStats() =>
+      widget.online || (stats?.containsKey('cpu_pct') ?? false);
 
   Widget _buildHeader() {
     return Row(
@@ -137,8 +218,22 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildStatusCard() {
-    final online = widget.online;
-    final color = online ? JTheme.green : JTheme.red;
+    final cloud = (stats?['_cloud'] as Map?) ?? const {};
+    final laptopOnline = widget.bridge.useCloud
+        ? ((cloud['laptop'] as Map?)?['online'] == true)
+        : widget.online;
+    final brainOk = widget.online;
+    final color = laptopOnline ? JTheme.green : JTheme.red;
+    final title = widget.bridge.useCloud
+        ? (laptopOnline ? 'LAPTOP ONLINE · CLOUD' : 'LAPTOP OFFLINE · CLOUD OK')
+        : (brainOk ? 'LAPTOP ONLINE' : 'LAPTOP OFFLINE');
+    final sub = widget.bridge.useCloud
+        ? (laptopOnline
+            ? 'Cloud brain linked - laptop daemon reporting'
+            : 'Brain reachable. Laptop daemon asleep or offline.')
+        : (brainOk
+            ? 'Bridge server reachable - all systems go'
+            : 'Laptop is powered off or bridge not started');
 
     return AnimatedBuilder(
       animation: _pulseController,
@@ -184,7 +279,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   SizedBox(width: 12),
                   Text(
-                    online ? 'LAPTOP ONLINE' : 'LAPTOP OFFLINE',
+                    title,
                     style: TextStyle(
                       color: color,
                       fontSize: 18,
@@ -196,13 +291,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               SizedBox(height: 12),
               Text(
-                online
-                    ? 'Bridge server reachable — all systems go'
-                    : 'Laptop is powered off or bridge not started',
+                sub,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: JTheme.textSecondary, fontSize: 13),
               ),
-              if (!online) ...[
+              if (!laptopOnline) ...[
                 SizedBox(height: 8),
                 Text(
                   'I\'ll notify you the moment it comes online.',

@@ -2,15 +2,41 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-/// Service that talks to the laptop's Zenith bridge server.
-/// Handles: status polling, command execution, online/offline detection.
+class BrainReply {
+  final String type;
+  final String reply;
+  final String? session;
+  BrainReply({required this.type, required this.reply, this.session});
+}
+
+/// Dual-mode service: CLOUD (render.com brain) or LAN (laptop bridge direct).
 class BridgeService {
   String host;
   int port;
+  String? cloudUrl;
+  String? pin;
 
   BridgeService({required this.host, this.port = 8990});
 
+  bool get useCloud => cloudUrl != null && (cloudUrl?.isNotEmpty ?? false);
+  bool get pinConfigured => (pin ?? '').isNotEmpty;
+
   String get baseUrl => 'http://$host:$port';
+
+  void configureCloud({required String url, required String pinValue}) {
+    var u = url.trim();
+    if (u.isEmpty) {
+      cloudUrl = null;
+      pin = null;
+      return;
+    }
+    if (!u.startsWith('http')) u = 'https://$u';
+    while (u.endsWith('/')) {
+      u = u.substring(0, u.length - 1);
+    }
+    cloudUrl = u;
+    pin = pinValue.trim();
+  }
 
   // ── State ──
   bool _isOnline = false;
@@ -24,13 +50,15 @@ class BridgeService {
   Stream<Map<String, dynamic>> get statusStream => _statusController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
 
+  Map<String, dynamic>? stats;
+
   Timer? _pollTimer;
 
-  // ── Polling ──
   void startPolling({int intervalSec = 8}) {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(Duration(seconds: intervalSec), (_) => _poll());
-    _poll(); // immediate first check
+    _pollTimer =
+        Timer.periodic(Duration(seconds: intervalSec), (_) => _poll());
+    _poll();
   }
 
   void stopPolling() {
@@ -40,32 +68,34 @@ class BridgeService {
   Future<void> _poll() async {
     final online = await ping();
     if (online != _isOnline) {
-      // State transition!
       _isOnline = online;
       if (online) {
         _lastOnline = DateTime.now();
         _wentOfflineAt = null;
-        _connectionController.add(true); // laptop just came ONLINE
+        _connectionController.add(true);
       } else {
         _wentOfflineAt = DateTime.now();
-        _connectionController.add(false); // laptop just went OFFLINE
+        _connectionController.add(false);
       }
     }
     if (online) {
       try {
-        stats = await getStatus();
+        stats = useCloud ? await cloudStatus() : await getStatus();
         _statusController.add(stats ?? {});
       } catch (_) {}
     }
   }
 
-  Map<String, dynamic>? stats;
-
   // ── API calls ──
 
-  /// Quick heartbeat — returns true if bridge is reachable.
   Future<bool> ping() async {
     try {
+      if (useCloud) {
+        final r = await http
+            .get(Uri.parse('$cloudUrl/api/ping'))
+            .timeout(const Duration(seconds: 10));
+        return r.statusCode == 200;
+      }
       final r = await http
           .get(Uri.parse('$baseUrl/api/ping'))
           .timeout(const Duration(seconds: 4));
@@ -75,7 +105,70 @@ class BridgeService {
     }
   }
 
-  /// Full system dashboard data.
+  Future<Map<String, dynamic>?> cloudStatus() async {
+    try {
+      final r = await http
+          .get(Uri.parse('$cloudUrl/api/status?pin=${Uri.encodeComponent(pin ?? '')}'))
+          .timeout(const Duration(seconds: 12));
+      if (r.statusCode == 200) {
+        final d = json.decode(r.body) as Map<String, dynamic>;
+        final flat = <String, dynamic>{};
+        if (d['stats'] is Map) {
+          (d['stats'] as Map).forEach((k, v) => flat[k.toString()] = v);
+        }
+        flat['_cloud'] = d;
+        return flat;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<BrainReply> askBrain(String text) async {
+    if (!useCloud) {
+      return BrainReply(
+          type: 'text', reply: '☁️ Cloud not configured — add URL & PIN in Settings.');
+    }
+    if (!pinConfigured) {
+      return BrainReply(type: 'text', reply: '🔑 Set your pairing PIN in Settings.');
+    }
+    try {
+      final r = await http
+          .post(
+            Uri.parse('$cloudUrl/api/command'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'command': text, 'pin': pin}),
+          )
+          .timeout(const Duration(seconds: 90));
+      if (r.statusCode == 401) {
+        return BrainReply(type: 'text', reply: '🔑 Wrong PIN — fix it in Settings.');
+      }
+      final d = json.decode(r.body);
+      return BrainReply(
+        type: d['type'] ?? 'text',
+        reply: d['reply'] ?? '…',
+        session: d['session'],
+      );
+    } catch (e) {
+      return BrainReply(type: 'text', reply: '⚠️ $e');
+    }
+  }
+
+  Future<BrainReply> respondConfirm(String session, String answer) async {
+    try {
+      final r = await http
+          .post(
+            Uri.parse('$cloudUrl/api/respond'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'session': session, 'text': answer, 'pin': pin}),
+          )
+          .timeout(const Duration(seconds: 90));
+      final d = json.decode(r.body);
+      return BrainReply(type: 'text', reply: d['reply'] ?? '…');
+    } catch (e) {
+      return BrainReply(type: 'text', reply: '⚠️ $e');
+    }
+  }
+
   Future<Map<String, dynamic>?> getStatus() async {
     try {
       final r = await http
@@ -86,7 +179,6 @@ class BridgeService {
     return null;
   }
 
-  /// Execute a tool on the laptop remotely.
   Future<String> runCommand(String tool, {Map<String, dynamic>? args}) async {
     try {
       final r = await http
@@ -103,7 +195,6 @@ class BridgeService {
     }
   }
 
-  /// List available tools on the laptop.
   Future<List<String>> getTools() async {
     try {
       final r = await http

@@ -12,8 +12,11 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _cloudUrlController = TextEditingController();
+  final _pinController = TextEditingController();
   final _hostController = TextEditingController();
-  String _savedHost = '';
+  bool _useCloud = true;
+  String _savedMsg = '';
 
   @override
   void initState() {
@@ -24,20 +27,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _savedHost = prefs.getString('laptop_host') ?? '';
-      _hostController.text = _savedHost;
+      _useCloud = prefs.getBool('zenith_use_cloud') ?? true;
+      _cloudUrlController.text =
+          prefs.getString('zenith_cloud_url') ?? 'https://zenith-cloud-brain.onrender.com';
+      _pinController.text = prefs.getString('zenith_pin') ?? '';
+      _hostController.text = prefs.getString('laptop_host') ?? '';
     });
   }
 
   Future<void> _save() async {
+    final url = _cloudUrlController.text.trim();
+    final pinVal = _pinController.text.trim();
     final host = _hostController.text.trim();
-    if (host.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('laptop_host', host);
-    widget.bridge.host = host;
-    setState(() => _savedHost = host);
+    await prefs.setBool('zenith_use_cloud', _useCloud);
+    await prefs.setString('zenith_cloud_url', url);
+    await prefs.setString('zenith_pin', pinVal);
+    if (host.isNotEmpty) {
+      await prefs.setString('laptop_host', host);
+      widget.bridge.host = host;
+    }
+    if (_useCloud && url.isNotEmpty) {
+      widget.bridge.configureCloud(url: url, pinValue: pinVal);
+    } else {
+      widget.bridge.configureCloud(url: '', pinValue: '');
+    }
+    setState(() => _savedMsg =
+        'Saved · Mode: ${_useCloud ? "CLOUD ☁️" : "LAN 💻"}${_useCloud && pinVal.isEmpty ? " (PIN missing!)" : ""}');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Laptop address saved: $host'),
+      content: Text(_savedMsg),
       backgroundColor: JTheme.surface,
       behavior: SnackBarBehavior.floating,
     ));
@@ -50,8 +68,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('CONNECTION',
-              style: TextStyle(color: JTheme.textMuted, fontSize: 11, letterSpacing: 1.5)),
+          Text('CONNECTION MODE',
+              style: TextStyle(
+                  color: JTheme.textMuted, fontSize: 11, letterSpacing: 1.5)),
+          SizedBox(height: 12),
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: JTheme.glassCard(),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('Use Cloud Brain ☁️',
+                      style: TextStyle(
+                          color: JTheme.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                      'Works anywhere via render.com.\nOFF = direct laptop on same Wi-Fi.',
+                      style:
+                          TextStyle(color: JTheme.textMuted, fontSize: 11)),
+                  value: _useCloud,
+                  activeColor: JTheme.cyan,
+                  onChanged: (v) => setState(() => _useCloud = v),
+                ),
+                SizedBox(height: 12),
+                TextField(
+                  controller: _cloudUrlController,
+                  enabled: _useCloud,
+                  style: TextStyle(color: JTheme.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Cloud Brain URL',
+                    labelStyle: TextStyle(color: JTheme.textMuted, fontSize: 12),
+                    hintText: 'https://zenith-cloud-brain.onrender.com',
+                    hintStyle: TextStyle(fontSize: 12),
+                  ),
+                ),
+                SizedBox(height: 12),
+                TextField(
+                  controller: _pinController,
+                  enabled: _useCloud,
+                  obscureText: true,
+                  style: TextStyle(color: JTheme.textPrimary, fontSize: 14, letterSpacing: 3),
+                  decoration: InputDecoration(
+                    labelText: 'Pairing PIN',
+                    labelStyle: TextStyle(color: JTheme.textMuted, fontSize: 12),
+                    hintText: 'same as Render BRIDGE_PIN',
+                    hintStyle: TextStyle(letterSpacing: 0, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _save,
+            icon: Icon(Icons.cloud_sync, size: 18),
+            label: Text('Save Connection', style: TextStyle(fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: JTheme.cyan,
+              foregroundColor: JTheme.bg,
+              minimumSize: Size(double.infinity, 46),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+          SizedBox(height: 24),
+          Text('LAN FALLBACK (OPTIONAL)',
+              style: TextStyle(
+                  color: JTheme.textMuted, fontSize: 11, letterSpacing: 1.5)),
           SizedBox(height: 12),
           Container(
             padding: EdgeInsets.all(16),
@@ -59,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Laptop IP Address',
+                Text('Laptop IP (direct Wi-Fi mode)',
                     style: TextStyle(color: JTheme.textSecondary, fontSize: 12)),
                 SizedBox(height: 8),
                 TextField(
@@ -67,30 +152,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(color: JTheme.textPrimary, fontSize: 14),
                   decoration: InputDecoration(hintText: '192.168.1.100'),
                 ),
-                SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: JTheme.cyan,
-                    foregroundColor: JTheme.bg,
-                    minimumSize: Size(double.infinity, 44),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: Text('Save & Connect', style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-                if (_savedHost.isNotEmpty)
-                  Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text('Connected to: $_savedHost',
-                        style: TextStyle(color: JTheme.textMuted, fontSize: 11)),
-                  ),
               ],
             ),
           ),
           SizedBox(height: 24),
           Text('ABOUT',
-              style: TextStyle(color: JTheme.textMuted, fontSize: 11, letterSpacing: 1.5)),
+              style: TextStyle(
+                  color: JTheme.textMuted, fontSize: 11, letterSpacing: 1.5)),
           SizedBox(height: 12),
           Container(
             padding: EdgeInsets.all(16),
@@ -98,16 +166,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('ZENITH Mobile v1.0', style: TextStyle(
-                    color: JTheme.cyan, fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('ZENITH Mobile v2.0 — Cloud Edition',
+                    style: TextStyle(
+                        color: JTheme.cyan,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14)),
                 SizedBox(height: 6),
-                Text('Cross-device manager for your Zenith AI laptop.\n'
-                     'Monitor status · Send commands · Get notified when it boots.',
-                     style: TextStyle(color: JTheme.textSecondary, fontSize: 12)),
-                SizedBox(height: 8),
-                Text('Make sure the Zenith bridge server is running on your laptop '
-                     '(it starts automatically with the agent).',
-                     style: TextStyle(color: JTheme.textMuted, fontSize: 11)),
+                Text(
+                    'Talk to ZENITH from anywhere. Phone tools run natively; '
+                    'laptop tools run remotely with your confirmation.',
+                    style: TextStyle(color: JTheme.textSecondary, fontSize: 12)),
               ],
             ),
           ),

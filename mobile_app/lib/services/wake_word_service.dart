@@ -41,7 +41,10 @@ class WakeWordService {
       final paths = <String, String>{};
       for (final f in _files) {
         paths[f] = await _materialize(f);
+        print('[WakeWord] Materialized: $f -> ${paths[f]}');
       }
+      print('[WakeWord] Configuring KWS with encoder: ${paths[_files[0]]}');
+      print('[WakeWord] Keywords file: ${paths['keywords_zenith.txt']}');
       final config = sherpa.KeywordSpotterConfig(
         model: sherpa.OnlineModelConfig(
           transducer: sherpa.OnlineTransducerModelConfig(
@@ -57,9 +60,12 @@ class WakeWordService {
         keywordsThreshold: 0.25,
       );
       _kws = sherpa.KeywordSpotter(config);
+      print('[WakeWord] KeywordSpotter created successfully');
       return true;
-    } catch (e) {
+    } catch (e, st) {
       lastError = e.toString();
+      print('[WakeWord] ERROR: $e');
+      print('[WakeWord] STACK: $st');
       return false;
     }
   }

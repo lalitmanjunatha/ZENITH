@@ -24,7 +24,11 @@ dependencies:
   device_info_plus: ^10.1.2
   connectivity_plus: ^6.0.3
   flutter_tts: ^4.0.2
-  sherpa_onnx: ^1.13.6
+  sherpa_onnx:
+    git:
+      url: https://github.com/k2-fsa/sherpa-onnx.git
+      path: flutter/sherpa_onnx
+      ref: master
 
 dev_dependencies:
   flutter_test:

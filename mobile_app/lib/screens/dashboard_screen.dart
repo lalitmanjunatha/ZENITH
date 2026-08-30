@@ -23,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   final PhoneTools _phone = PhoneTools();
   final AlwaysListeningService _listener = AlwaysListeningService();
   bool _listeningOn = false;
+  String _voiceStatus = '';
 
   @override
   void initState() {
@@ -176,7 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _toggleListening() async {
     if (_listeningOn) {
       _listener.stop();
-      setState(() => _listeningOn = false);
+      setState(() { _listeningOn = false; _voiceStatus = ''; });
       ZenithToasts.info('Always-listening OFF', duration: const Duration(seconds: 2));
       return;
     }
@@ -185,6 +186,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       ZenithToasts.error(_listener.lastError ?? 'Speech recognition unavailable.');
       return;
     }
+    _listener.onStatus = (s) {
+      if (mounted) setState(() => _voiceStatus = s);
+    };
     _listener.onListening = () {
       if (!mounted) return;
       ZenithToasts.success('Yes? Speak your command.', duration: const Duration(seconds: 3));
@@ -246,6 +250,11 @@ class _DashboardScreenState extends State<DashboardScreen>
             ]),
           ),
         ),
+        if (_listeningOn && _voiceStatus.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(_voiceStatus,
+              style: TextStyle(color: JTheme.textMuted, fontSize: 10)),
+        ],
       ],
     );
   }

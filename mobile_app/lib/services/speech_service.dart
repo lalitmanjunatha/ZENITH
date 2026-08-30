@@ -68,14 +68,13 @@ class SpeechService {
       },
       listenOptions: stt.SpeechListenOptions(
         partialResults: true,
-        cancelOnError: true,
+        cancelOnError: false,
         listenMode: stt.ListenMode.dictation,
       ),
-      localeId: 'en_US', // can be changed to hi_IN for Hindi
+      localeId: 'en_US',
     );
 
-    // Auto-stop after 8 seconds of no speech
-    Future.delayed(Duration(seconds: 8), () {
+    Future.delayed(Duration(seconds: 12), () {
       if (_listening) {
         stop();
         if (_lastWords.isNotEmpty) onResult(_lastWords);

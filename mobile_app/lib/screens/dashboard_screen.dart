@@ -184,15 +184,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   final PhoneTools _phone = PhoneTools();
   final WakeWordService _wake = WakeWordService();
-  bool _torch = false;
   bool _wakeOn = false;
-
-  void _runPhoneTool(String label, Future<String> Function() fn) {
-    ZenithToasts.info('$label…', duration: const Duration(seconds: 1));
-    fn().then((r) {
-      if (mounted) _showBrainReply(r);
-    });
-  }
 
   Future<void> _toggleWake() async {
     if (_wakeOn) {
@@ -202,22 +194,38 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     final ok = await _wake.init();
     if (!ok) {
-      _showBrainReply('Wake word engine failed to load.');
+      ZenithToasts.error('Wake word engine failed to load.');
       return;
     }
-    _wake.onWake = (kw) {
+    _wake.onWake = (kw) async {
       if (!mounted) return;
-      _phone.execute('phone_tts_speak',
-          {'text': kw.contains('HEY') ? 'Yes?' : 'Listening'});
       ZenithToasts.success('🎙 Wake word detected ($kw) — speak your command',
           duration: const Duration(seconds: 3));
+      _phone.execute('phone_tts_speak',
+          {'text': kw.contains('HEY') ? 'Yes?' : 'Listening'});
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      final ok = await _speech.init();
+      if (!ok) {
+        ZenithToasts.error('Speech recognition unavailable');
+        return;
+      }
+      _speech.listen(
+        onResult: (text) {
+          if (text.isNotEmpty && mounted) _onVoiceCommand(text);
+        },
+        onPartialResult: (partial) {},
+      );
     };
     _wake.start();
     if (mounted) {
       setState(() => _wakeOn = _wake.isRunning);
-      _showBrainReply(_wake.isRunning
-          ? 'Always-listening ON - say "ZENITH" anytime.'
-          : 'Mic stream unavailable for wake mode.');
+      if (_wake.isRunning) {
+        ZenithToasts.success('Always-listening ON — say "ZENITH" anytime.',
+            duration: const Duration(seconds: 3));
+      } else {
+        ZenithToasts.error('Mic stream unavailable for wake mode.');
+      }
     }
   }
 
@@ -259,76 +267,16 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildPhoneActions() {
-    Widget chip(String label, IconData icon, VoidCallback onTap) =>
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-            decoration: JTheme.glassCard(),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: JTheme.cyan, size: 20),
-                const SizedBox(height: 6),
-                Text(label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: JTheme.textSecondary, fontSize: 10)),
-              ],
-            ),
-          ),
-        );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('PHONE AI — RUNS ON THIS DEVICE',
+        Text('ALWAYS-LISTENING',
             style: TextStyle(
                 color: JTheme.textMuted,
                 fontSize: 11,
                 letterSpacing: 1.5)),
         const SizedBox(height: 10),
         _buildWakeToggle(),
-        const SizedBox(height: 12),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 4,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 1.05,
-          children: [
-            chip('Flashlight', Icons.flashlight_on, () {
-              _torch = !_torch;
-              _runPhoneTool('Torch ${_torch ? "ON" : "OFF"}',
-                  () => _phone.execute('phone_flashlight', {'on': _torch}));
-            }),
-            chip('Battery', Icons.battery_5_bar,
-                () => _runPhoneTool('Checking battery',
-                    () => _phone.execute('phone_battery', {}))),
-            chip('Location', Icons.location_on_outlined,
-                () => _runPhoneTool('Getting GPS fix',
-                    () => _phone.execute('phone_location', {}))),
-            chip('Wi-Fi', Icons.wifi,
-                () => _runPhoneTool('Reading Wi-Fi',
-                    () => _phone.execute('phone_wifi_status', {}))),
-            chip('Vibrate', Icons.vibration,
-                () => _runPhoneTool('Vibrating',
-                    () => _phone.execute('phone_vibrate', {}))),
-            chip('Selfie', Icons.photo_camera_outlined,
-                () => _runPhoneTool('Opening front camera',
-                    () => _phone.execute('phone_selfie', {}))),
-            chip('Storage', Icons.storage_outlined,
-                () => _runPhoneTool('Reading storage',
-                    () => _phone.execute('phone_storage_stats', {}))),
-            chip('Speak test', Icons.record_voice_over_outlined,
-                () => _runPhoneTool('Speaking',
-                    () => _phone.execute(
-                        'phone_tts_speak',
-                        {'text': 'Zenith phone systems online.'}))),
-          ],
-        ),
-        const SizedBox(height: 24),
       ],
     );
   }

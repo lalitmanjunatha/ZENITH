@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../theme/jarvis_theme.dart';
 import '../services/bridge_service.dart';
-import '../services/speech_service.dart';
+import '../services/always_listening_service.dart';
 import '../services/phone_tools.dart';
-import '../services/wake_word_service.dart';
-import '../widgets/mic_button.dart';
 import '../widgets/toast_host.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -22,7 +20,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _pulseController;
   StreamSubscription? _statusSub;
   Map<String, dynamic>? stats;
-  late SpeechService _speech;
+  final PhoneTools _phone = PhoneTools();
+  final AlwaysListeningService _listener = AlwaysListeningService();
+  bool _listeningOn = false;
 
   @override
   void initState() {
@@ -36,8 +36,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       setState(() => stats = data);
       _checkLaptopTransition(data);
     });
-    _speech = SpeechService();
-    _speech.init();
   }
 
   bool? _lastLaptopOnline;
@@ -84,7 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   void _showBrainReply(String text) {
     if (!mounted) return;
-    if (_wakeOn && text.length <= 160) {
+    if (_listeningOn && text.length <= 160) {
       _phone.execute('phone_tts_speak', {'text': text});
     }
     if (text.length > 220) {
@@ -162,130 +160,91 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
                 child: Text(
                   widget.online
-                      ? '☁️ Brain · 💻 Laptop ONLINE'
-                      : '☁️ Brain · 💻 Laptop offline',
+                      ? 'Brain · Laptop ONLINE'
+                      : 'Brain · Laptop offline',
                   style: TextStyle(color: JTheme.textMuted, fontSize: 11),
                 ),
               ),
             ),
           ],
-          SizedBox(height: 24),
-          Center(
-            child: MicButton(
-              speech: _speech,
-              onCommand: _onVoiceCommand,
-              laptopOnline: true,
-            ),
-          ),
         ],
       ),
     );
   }
 
-  final PhoneTools _phone = PhoneTools();
-  final WakeWordService _wake = WakeWordService();
-  bool _wakeOn = false;
-
-  Future<void> _toggleWake() async {
-    if (_wakeOn) {
-      _wake.stop();
-      setState(() => _wakeOn = false);
+  Future<void> _toggleListening() async {
+    if (_listeningOn) {
+      _listener.stop();
+      setState(() => _listeningOn = false);
+      ZenithToasts.info('Always-listening OFF', duration: const Duration(seconds: 2));
       return;
     }
-    final ok = await _wake.init();
+    final ok = await _listener.init();
     if (!ok) {
-      ZenithToasts.error(_wake.lastError ?? 'Speech recognition unavailable.');
+      ZenithToasts.error(_listener.lastError ?? 'Speech recognition unavailable.');
       return;
     }
-    _wake.onWake = (kw) async {
+    _listener.onListening = () {
       if (!mounted) return;
-      ZenithToasts.success('🎙 Wake word detected ($kw) — speak your command',
-          duration: const Duration(seconds: 3));
-      _phone.execute('phone_tts_speak',
-          {'text': kw.contains('HEY') ? 'Yes?' : 'Listening'});
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
-
-      // Pause wake word so its SpeechToText releases the mic
-      await _wake.pause();
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (!mounted) { _wake.resume(); return; }
-
-      final speechOk = await _speech.init();
-      if (!speechOk) {
-        ZenithToasts.error('Speech recognition unavailable');
-        _wake.resume();
-        return;
-      }
-
-      _speech.onStopped = () {
-        _wake.resume();
-      };
-      _speech.listen(
-        onResult: (text) {
-          _speech.onStopped = null;
-          _wake.resume();
-          if (text.isNotEmpty && mounted) _onVoiceCommand(text);
-        },
-        onPartialResult: (partial) {},
-      );
+      ZenithToasts.success('Yes? Speak your command.', duration: const Duration(seconds: 3));
+      _phone.execute('phone_tts_speak', {'text': 'Yes?'});
     };
-    _wake.start();
+    _listener.onCommand = (cmd) {
+      if (!mounted) return;
+      _onVoiceCommand(cmd);
+    };
+    _listener.start();
     if (mounted) {
-      setState(() => _wakeOn = true);
+      setState(() => _listeningOn = true);
       ZenithToasts.success('Always-listening ON — say "ZENITH" anytime.',
           duration: const Duration(seconds: 3));
     }
-  }
-
-  Widget _buildWakeToggle() {
-    return InkWell(
-      onTap: _toggleWake,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        decoration: BoxDecoration(
-          color: _wakeOn
-              ? JTheme.cyan.withOpacity(0.15)
-              : JTheme.card.withOpacity(0.6),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color:
-                  (_wakeOn ? JTheme.cyan : JTheme.border).withOpacity(0.4)),
-        ),
-        child: Row(children: [
-          Icon(_wakeOn ? Icons.graphic_eq : Icons.mic_none,
-              color: _wakeOn ? JTheme.cyan : JTheme.textMuted, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _wakeOn
-                  ? 'ALWAYS-LISTENING ON - say "ZENITH"'
-                  : 'Enable always-listening ("ZENITH")',
-              style: TextStyle(
-                  color: _wakeOn ? JTheme.cyan : JTheme.textSecondary,
-                  fontSize: 11),
-            ),
-          ),
-          Icon(Icons.power_settings_new,
-              size: 16,
-              color: _wakeOn ? JTheme.green : JTheme.textMuted),
-        ]),
-      ),
-    );
   }
 
   Widget _buildPhoneActions() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('ALWAYS-LISTENING',
+        Text('VOICE',
             style: TextStyle(
                 color: JTheme.textMuted,
                 fontSize: 11,
                 letterSpacing: 1.5)),
         const SizedBox(height: 10),
-        _buildWakeToggle(),
+        InkWell(
+          onTap: _toggleListening,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+            decoration: BoxDecoration(
+              color: _listeningOn
+                  ? JTheme.cyan.withOpacity(0.15)
+                  : JTheme.card.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color:
+                      (_listeningOn ? JTheme.cyan : JTheme.border).withOpacity(0.4)),
+            ),
+            child: Row(children: [
+              Icon(_listeningOn ? Icons.graphic_eq : Icons.mic_none,
+                  color: _listeningOn ? JTheme.cyan : JTheme.textMuted, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _listeningOn
+                      ? 'ALWAYS ON - say "ZENITH" + command'
+                      : 'Tap to enable always-listening',
+                  style: TextStyle(
+                      color: _listeningOn ? JTheme.cyan : JTheme.textSecondary,
+                      fontSize: 11),
+                ),
+              ),
+              Icon(Icons.power_settings_new,
+                  size: 16,
+                  color: _listeningOn ? JTheme.green : JTheme.textMuted),
+            ]),
+          ),
+        ),
       ],
     );
   }
@@ -323,8 +282,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     final cloudLaptopOnline = (cloud['laptop'] as Map?)?['online'] == true;
     final brainOk = widget.online;
 
-    // Cloud mode: prefer cloud's laptop status; fallback to brain reachable
-    // LAN mode: just use ping result
     final laptopOnline = widget.bridge.useCloud
         ? (stats != null ? cloudLaptopOnline : brainOk)
         : brainOk;
@@ -363,11 +320,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           child: Column(
             children: [
-              // Status dot + label
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Pulsing indicator
                   Container(
                     width: 14, height: 14,
                     decoration: BoxDecoration(
@@ -500,26 +455,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             Text(label, style: TextStyle(
               color: widget.online ? JTheme.textPrimary : JTheme.textMuted,
               fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOfflineMessage() {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Column(
-          children: [
-            Icon(Icons.laptop_windows, size: 60, color: JTheme.textMuted.withOpacity(0.3)),
-            SizedBox(height: 16),
-            Text('Laptop is offline',
-                style: TextStyle(color: JTheme.textMuted, fontSize: 15)),
-            SizedBox(height: 6),
-            Text('Stats and commands unavailable until it comes back online.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: JTheme.textMuted.withOpacity(0.5), fontSize: 12)),
           ],
         ),
       ),

@@ -715,11 +715,10 @@ packages:
   sherpa_onnx:
     dependency: "direct main"
     description:
-      path: "flutter/sherpa_onnx"
-      ref: master
-      resolved-ref: "9e6bc2f2b1db2cc9024e97886e8debf589e6d6a0"
-      url: "https://github.com/k2-fsa/sherpa-onnx.git"
-    source: git
+      name: sherpa_onnx
+      sha256: "5d6cd57eca94caf4b3ce3b07d9affb11ad68d14c37e1e7aa3f60e63b59aee361"
+      url: "https://pub.dev"
+    source: hosted
     version: "1.13.6"
   sherpa_onnx_android_arm64:
     dependency: transitive

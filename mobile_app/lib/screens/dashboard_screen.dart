@@ -194,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
     final ok = await _wake.init();
     if (!ok) {
-      ZenithToasts.error('Wake word engine failed to load.');
+      ZenithToasts.error(_wake.lastError ?? 'Speech recognition unavailable.');
       return;
     }
     _wake.onWake = (kw) async {
@@ -205,8 +205,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           {'text': kw.contains('HEY') ? 'Yes?' : 'Listening'});
       await Future.delayed(const Duration(milliseconds: 800));
       if (!mounted) return;
-      final ok = await _speech.init();
-      if (!ok) {
+      final speechOk = await _speech.init();
+      if (!speechOk) {
         ZenithToasts.error('Speech recognition unavailable');
         return;
       }
@@ -219,13 +219,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     };
     _wake.start();
     if (mounted) {
-      setState(() => _wakeOn = _wake.isRunning);
-      if (_wake.isRunning) {
-        ZenithToasts.success('Always-listening ON — say "ZENITH" anytime.',
-            duration: const Duration(seconds: 3));
-      } else {
-        ZenithToasts.error('Mic stream unavailable for wake mode.');
-      }
+      setState(() => _wakeOn = true);
+      ZenithToasts.success('Always-listening ON — say "ZENITH" anytime.',
+          duration: const Duration(seconds: 3));
     }
   }
 

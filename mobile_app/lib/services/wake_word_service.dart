@@ -1,118 +1,82 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/services.dart' show rootBundle, EventChannel;
-import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-/// Always-on "ZENITH" wake word using sherpa-onnx open-vocabulary KWS.
-/// Fully offline, phoneme-based keyword spotting on a 16 kHz mic stream.
+/// Always-on "ZENITH" wake word using speech_to_text.
+/// Continuously listens for the keyword in any language, then fires [onWake].
 class WakeWordService {
   static final WakeWordService _i = WakeWordService._();
   factory WakeWordService() => _i;
   WakeWordService._();
 
-  sherpa.KeywordSpotter? _kws;
-  StreamSubscription<dynamic>? _micSub;
+  final stt.SpeechToText _speech = stt.SpeechToText();
   bool _running = false;
+  bool _initialized = false;
   bool get isRunning => _running;
   String? lastError;
 
   Function(String keyword)? onWake;
 
-  static const _dir = 'kws';
-  static const _files = [
-    'encoder-epoch-13-avg-2-chunk-16-left-64.int8.onnx',
-    'decoder-epoch-13-avg-2-chunk-16-left-64.onnx',
-    'joiner-epoch-13-avg-2-chunk-16-left-64.int8.onnx',
-    'tokens.txt',
-    'keywords_zenith.txt',
-  ];
-
-  Future<String> _materialize(String name) async {
-    final data = await rootBundle.load('assets/$_dir/$name');
-    final path = '${Directory.systemTemp.path}/zenith_kws_$name';
-    await File(path).writeAsBytes(data.buffer.asUint8List(), flush: true);
-    return path;
-  }
-
   Future<bool> init() async {
-    if (_kws != null) return true;
+    if (_initialized) return true;
     try {
-      print('[WakeWord] Initializing sherpa-onnx bindings...');
-      sherpa.initBindings();
-      print('[WakeWord] Bindings OK. Materializing model files...');
-      final paths = <String, String>{};
-      for (final f in _files) {
-        paths[f] = await _materialize(f);
-      }
-      print('[WakeWord] Configuring KWS...');
-      final config = sherpa.KeywordSpotterConfig(
-        model: sherpa.OnlineModelConfig(
-          transducer: sherpa.OnlineTransducerModelConfig(
-            encoder: paths[_files[0]]!,
-            decoder: paths[_files[1]]!,
-            joiner: paths[_files[2]]!,
-          ),
-          tokens: paths['tokens.txt']!,
-          numThreads: 1,
-        ),
-        keywordsFile: paths['keywords_zenith.txt']!,
-        keywordsScore: 2.0,
-        keywordsThreshold: 0.25,
+      _initialized = await _speech.initialize(
+        onError: (e) {
+          if (_running && e.errorMsg != 'noSpeech' && e.errorMsg != 'retry') {
+            lastError = e.errorMsg;
+          }
+        },
+        onStatus: (status) {
+          if (_running && (status == 'done' || status == 'notListening')) {
+            _restartListening();
+          }
+        },
       );
-      _kws = sherpa.KeywordSpotter(config);
-      print('[WakeWord] KeywordSpotter created OK');
-      return true;
-    } catch (e, st) {
+      if (!_initialized) {
+        lastError = 'Speech recognition unavailable on this device';
+      }
+      return _initialized;
+    } catch (e) {
       lastError = e.toString();
-      print('[WakeWord] FAILED: $e');
-      print('[WakeWord] STACK: $st');
+      _initialized = false;
       return false;
     }
   }
 
   void start() {
-    if (_running || _kws == null) return;
-    final stream = _kws!.createStream();
+    if (_running) return;
     _running = true;
-
-    _micSub = EventChannel('zenith_pcm')
-        .receiveBroadcastStream({'sampleRate': 16000})
-        .listen((chunk) {
-      if (!_running || chunk == null || (chunk as Uint8List).isEmpty) return;
-      try {
-        stream.acceptWaveform(samples: _toFloat(chunk), sampleRate: 16000);
-        while (_kws!.isReady(stream)) {
-          _kws!.decode(stream);
-        }
-        final kw = _kws!.getResult(stream).keyword.trim();
-        if (kw.isNotEmpty) {
-          _kws!.reset(stream);
-          onWake?.call(kw);
-        }
-      } catch (_) {}
-    }, onError: (_) {});
+    _restartListening();
   }
 
-  Float32List _toFloat(Uint8List pcm16) {
-    final len = pcm16.length ~/ 2;
-    final out = Float32List(len);
-    final bd = ByteData.sublistView(pcm16);
-    for (var i = 0; i < len; i++) {
-      out[i] = bd.getInt16(i * 2, Endian.little) / 32768.0;
-    }
-    return out;
+  void _restartListening() {
+    if (!_running) return;
+    _speech.listen(
+      onResult: (result) {
+        if (!_running) return;
+        final text = result.recognizedWords.toLowerCase();
+        if (text.contains('zenith') || text.contains('hey zenith')) {
+          final kw = text.contains('hey') ? 'HEY_ZENITH' : 'ZENITH';
+          onWake?.call(kw);
+        }
+      },
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      ),
+    ).catchError((_) {});
+    Timer(const Duration(seconds: 10), () {
+      if (_running) _restartListening();
+    });
   }
 
   void stop() {
     _running = false;
-    _micSub?.cancel();
-    _micSub = null;
+    _speech.stop().catchError((_) {});
   }
 
   void dispose() {
     stop();
-    _kws?.free();
-    _kws = null;
+    _initialized = false;
   }
 }

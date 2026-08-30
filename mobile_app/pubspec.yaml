@@ -24,7 +24,6 @@ dependencies:
   device_info_plus: ^10.1.2
   connectivity_plus: ^6.0.3
   flutter_tts: ^4.0.2
-  sherpa_onnx: ^1.13.6
 
 dev_dependencies:
   flutter_test:
@@ -33,5 +32,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/kws/

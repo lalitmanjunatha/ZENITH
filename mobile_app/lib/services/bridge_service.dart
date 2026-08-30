@@ -93,7 +93,7 @@ class BridgeService {
       if (useCloud) {
         final r = await http
             .get(Uri.parse('$cloudUrl/api/ping'))
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 60));
         return r.statusCode == 200;
       }
       final r = await http
@@ -109,7 +109,7 @@ class BridgeService {
     try {
       final r = await http
           .get(Uri.parse('$cloudUrl/api/status?pin=${Uri.encodeComponent(pin ?? '')}'))
-          .timeout(const Duration(seconds: 12));
+          .timeout(const Duration(seconds: 60));
       if (r.statusCode == 200) {
         final d = json.decode(r.body) as Map<String, dynamic>;
         final flat = <String, dynamic>{};

@@ -38,13 +38,14 @@ class WakeWordService {
   Future<bool> init() async {
     if (_kws != null) return true;
     try {
+      print('[WakeWord] Initializing sherpa-onnx bindings...');
+      sherpa.initBindings();
+      print('[WakeWord] Bindings OK. Materializing model files...');
       final paths = <String, String>{};
       for (final f in _files) {
         paths[f] = await _materialize(f);
-        print('[WakeWord] Materialized: $f -> ${paths[f]}');
       }
-      print('[WakeWord] Configuring KWS with encoder: ${paths[_files[0]]}');
-      print('[WakeWord] Keywords file: ${paths['keywords_zenith.txt']}');
+      print('[WakeWord] Configuring KWS...');
       final config = sherpa.KeywordSpotterConfig(
         model: sherpa.OnlineModelConfig(
           transducer: sherpa.OnlineTransducerModelConfig(
@@ -60,11 +61,11 @@ class WakeWordService {
         keywordsThreshold: 0.25,
       );
       _kws = sherpa.KeywordSpotter(config);
-      print('[WakeWord] KeywordSpotter created successfully');
+      print('[WakeWord] KeywordSpotter created OK');
       return true;
     } catch (e, st) {
       lastError = e.toString();
-      print('[WakeWord] ERROR: $e');
+      print('[WakeWord] FAILED: $e');
       print('[WakeWord] STACK: $st');
       return false;
     }

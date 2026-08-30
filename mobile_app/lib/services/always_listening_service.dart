@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
-/// Always-on voice listener — SINGLE SpeechToText instance.
-/// Detects "ZENITH" wake word, captures command, keeps mic alive as long as possible.
+/// Voice listener — SINGLE SpeechToText instance.
+/// Detects "ZENITH" wake word, captures command.
+/// Mic runs one session at a time. Auto-restarts ONLY after command processing.
 class AlwaysListeningService {
   static final AlwaysListeningService _i = AlwaysListeningService._();
   factory AlwaysListeningService() => _i;
@@ -12,10 +13,10 @@ class AlwaysListeningService {
   bool _running = false;
   bool _awaitingCommand = false;
   bool _processingCommand = false;
+  bool _sessionActive = false;
   String? lastError;
   Timer? _restartTimer;
   Timer? _awaitTimer;
-  int _sessionCount = 0;
 
   Function(String command)? onCommand;
   Function()? onListening;
@@ -24,27 +25,19 @@ class AlwaysListeningService {
   bool get isRunning => _running;
 
   Future<bool> init() async {
-    if (_stt.isAvailable) return true;
     try {
       final ok = await _stt.initialize(
-        onError: (e) {
-          lastError = e.errorMsg;
-          onStatus?.call('Error: ${e.errorMsg}');
-          if (_running && !_processingCommand) _scheduleRestart(5);
-        },
-        onStatus: (status) {
-          if (!_running) return;
-          onStatus?.call(status);
-        },
+        onError: _onError,
+        onStatus: _onStatus,
       );
       if (!ok) {
-        lastError = 'Speech recognition unavailable on this device';
-        onStatus?.call('Unavailable');
+        lastError = 'Speech unavailable — grant microphone permission in Settings';
+        onStatus?.call(lastError!);
       }
       return ok;
     } catch (e) {
-      lastError = e.toString();
-      onStatus?.call('Init failed: $e');
+      lastError = 'Init failed: $e';
+      onStatus?.call(lastError!);
       return false;
     }
   }
@@ -56,7 +49,6 @@ class AlwaysListeningService {
     _running = true;
     _awaitingCommand = false;
     _processingCommand = false;
-    _sessionCount = 0;
     _beginListen();
   }
 
@@ -64,31 +56,70 @@ class AlwaysListeningService {
     _running = false;
     _awaitingCommand = false;
     _processingCommand = false;
+    _sessionActive = false;
     _restartTimer?.cancel();
     _awaitTimer?.cancel();
     try { _stt.stop(); } catch (_) {}
     try { _stt.cancel(); } catch (_) {}
-    onStatus?.call('Stopped');
+    onStatus?.call('OFF');
   }
 
   void _beginListen() {
     if (!_running) return;
-    _sessionCount++;
-    onStatus?.call('Listening (#$_sessionCount)...');
+    _sessionActive = true;
+    onStatus?.call('Listening — say "ZENITH"');
     _stt.listen(
       onResult: _onResult,
       listenOptions: stt.SpeechListenOptions(
         partialResults: true,
-        cancelOnError: false,
+        cancelOnError: true,
         listenMode: stt.ListenMode.dictation,
-        listenFor: const Duration(minutes: 5),
-        pauseFor: const Duration(seconds: 30),
+        listenFor: const Duration(minutes: 3),
+        pauseFor: const Duration(seconds: 20),
       ),
     ).catchError((e) {
+      _sessionActive = false;
       lastError = e.toString();
-      onStatus?.call('Listen error: $e');
-      if (_running) _scheduleRestart(5);
+      if (_running) {
+        onStatus?.call('Mic error — retrying...');
+        _scheduleRestart(5);
+      }
     });
+    // DO NOT use .then() to restart — that causes the loop.
+    // Session ends naturally and stays dead until we explicitly restart.
+  }
+
+  void _onError(dynamic e) {
+    if (!_running) return;
+    final code = e.errorMsg as String? ?? '';
+    _sessionActive = false;
+
+    // noSpeech = user is silent, mic works fine. Just wait — don't restart.
+    if (code == 'noSpeech' || code == 'notRecognized') {
+      onStatus?.call('Listening — say "ZENITH"');
+      return;
+    }
+
+    // For actual errors, restart with backoff
+    lastError = code;
+    onStatus?.call('Error: $code — retrying...');
+    _scheduleRestart(5);
+  }
+
+  void _onStatus(String status) {
+    if (!_running) return;
+
+    // Session ended naturally — DON'T restart, just report.
+    // Only restarts happen after command processing or on errors.
+    if (status == 'done' || status == 'notListening') {
+      _sessionActive = false;
+      if (!_processingCommand && !_awaitingCommand) {
+        onStatus?.call('Mic paused — tap toggle to restart');
+      }
+      return;
+    }
+
+    onStatus?.call(status);
   }
 
   void _onResult(dynamic result) {
@@ -128,8 +159,7 @@ class AlwaysListeningService {
         _awaitTimer = Timer(const Duration(seconds: 8), () {
           if (_awaitingCommand) {
             _awaitingCommand = false;
-            onStatus?.call('Command timeout — listening again...');
-            _scheduleRestart(2);
+            onStatus?.call('Listening — say "ZENITH"');
           }
         });
       }
@@ -143,6 +173,7 @@ class AlwaysListeningService {
     });
   }
 
+  /// Called after command is processed — restarts mic for next command.
   void onCommandProcessed() {
     _processingCommand = false;
     if (_running) _scheduleRestart(2);

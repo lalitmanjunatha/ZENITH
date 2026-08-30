@@ -77,6 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           _showBrainReply(reply.reply);
         }
       }
+      _listener.onCommandProcessed();
     });
   }
 

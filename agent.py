@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # =========================
 from livekit import agents
 from livekit.agents import Agent, AgentSession, RoomInputOptions
-from livekit.plugins import noise_cancellation
+from livekit.plugins import google as livekit_google
 
 # Gemini realtime (network-safe)
 network_available = False
@@ -661,11 +661,15 @@ class UltimateAdvancedZenith(Agent):
 
     def _init_llm(self):
         if network_available:
+            from google.genai import types as gemini_types
             return RealtimeModel(
-                model="gemini-2.5-flash-native-audio-preview-12-2025",
-                voice="Charon",
-                temperature=0.9,
+                model="gemini-2.0-flash-live-001",
+                voice="Kore",
+                temperature=0.7,
+                language="en-US",
                 max_output_tokens=1024,
+                input_audio_transcription=gemini_types.AudioTranscriptionConfig(),
+                output_audio_transcription=gemini_types.AudioTranscriptionConfig(),
             )
         return None
 
@@ -780,7 +784,6 @@ async def entrypoint(ctx: agents.JobContext):
         agent=agent,
         room_input_options=RoomInputOptions(
             video_enabled=False,
-            noise_cancellation=noise_cancellation.BVC(),
         ),
     )
 

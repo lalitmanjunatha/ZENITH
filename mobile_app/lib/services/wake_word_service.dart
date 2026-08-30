@@ -11,6 +11,7 @@ class WakeWordService {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _running = false;
   bool _initialized = false;
+  bool _paused = false;
   bool get isRunning => _running;
   String? lastError;
 
@@ -21,12 +22,14 @@ class WakeWordService {
     try {
       _initialized = await _speech.initialize(
         onError: (e) {
-          if (_running && e.errorMsg != 'noSpeech' && e.errorMsg != 'retry') {
+          if (_running && !_paused &&
+              e.errorMsg != 'noSpeech' && e.errorMsg != 'retry') {
             lastError = e.errorMsg;
           }
         },
         onStatus: (status) {
-          if (_running && (status == 'done' || status == 'notListening')) {
+          if (_running && !_paused &&
+              (status == 'done' || status == 'notListening')) {
             _restartListening();
           }
         },
@@ -45,14 +48,29 @@ class WakeWordService {
   void start() {
     if (_running) return;
     _running = true;
+    _paused = false;
+    _restartListening();
+  }
+
+  /// Temporarily stop listening so another SpeechToText can take over
+  /// (e.g. command capture after wake word detected).
+  Future<void> pause() async {
+    _paused = true;
+    await _speech.stop().catchError((_) {});
+  }
+
+  /// Resume wake word listening after command capture is done.
+  void resume() {
+    if (!_running) return;
+    _paused = false;
     _restartListening();
   }
 
   void _restartListening() {
-    if (!_running) return;
+    if (!_running || _paused) return;
     _speech.listen(
       onResult: (result) {
-        if (!_running) return;
+        if (!_running || _paused) return;
         final text = result.recognizedWords.toLowerCase();
         if (text.contains('zenith') || text.contains('hey zenith')) {
           final kw = text.contains('hey') ? 'HEY_ZENITH' : 'ZENITH';
@@ -66,12 +84,13 @@ class WakeWordService {
       ),
     ).catchError((_) {});
     Timer(const Duration(seconds: 10), () {
-      if (_running) _restartListening();
+      if (_running && !_paused) _restartListening();
     });
   }
 
   void stop() {
     _running = false;
+    _paused = false;
     _speech.stop().catchError((_) {});
   }
 

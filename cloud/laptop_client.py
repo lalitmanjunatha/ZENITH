@@ -19,8 +19,11 @@ import time
 from pathlib import Path
 
 import websockets
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")
+
 sys.path.insert(0, str(ROOT))
 
 CLOUD_URL = os.environ.get("ZENITH_CLOUD_URL", "ws://127.0.0.1:8123/ws")

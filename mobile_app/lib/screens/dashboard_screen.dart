@@ -203,15 +203,28 @@ class _DashboardScreenState extends State<DashboardScreen>
           duration: const Duration(seconds: 3));
       _phone.execute('phone_tts_speak',
           {'text': kw.contains('HEY') ? 'Yes?' : 'Listening'});
-      await Future.delayed(const Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
+
+      // Pause wake word so its SpeechToText releases the mic
+      await _wake.pause();
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) { _wake.resume(); return; }
+
       final speechOk = await _speech.init();
       if (!speechOk) {
         ZenithToasts.error('Speech recognition unavailable');
+        _wake.resume();
         return;
       }
+
+      _speech.onStopped = () {
+        _wake.resume();
+      };
       _speech.listen(
         onResult: (text) {
+          _speech.onStopped = null;
+          _wake.resume();
           if (text.isNotEmpty && mounted) _onVoiceCommand(text);
         },
         onPartialResult: (partial) {},
@@ -307,10 +320,14 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildStatusCard() {
     final cloud = (stats?['_cloud'] as Map?) ?? const {};
-    final laptopOnline = widget.bridge.useCloud
-        ? ((cloud['laptop'] as Map?)?['online'] == true)
-        : widget.online;
+    final cloudLaptopOnline = (cloud['laptop'] as Map?)?['online'] == true;
     final brainOk = widget.online;
+
+    // Cloud mode: prefer cloud's laptop status; fallback to brain reachable
+    // LAN mode: just use ping result
+    final laptopOnline = widget.bridge.useCloud
+        ? (stats != null ? cloudLaptopOnline : brainOk)
+        : brainOk;
     final color = laptopOnline ? JTheme.green : JTheme.red;
     final title = widget.bridge.useCloud
         ? (laptopOnline ? 'LAPTOP ONLINE · CLOUD' : 'LAPTOP OFFLINE · CLOUD OK')
@@ -318,7 +335,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final sub = widget.bridge.useCloud
         ? (laptopOnline
             ? 'Cloud brain linked - laptop daemon reporting'
-            : 'Brain reachable. Laptop daemon asleep or offline.')
+            : 'Brain reachable. Run START_ZENITH_CLOUD.bat on laptop.')
         : (brainOk
             ? 'Bridge server reachable - all systems go'
             : 'Laptop is powered off or bridge not started');

@@ -127,7 +127,15 @@ class MainActivity : FlutterActivity() {
             MediaRecorder.AudioSource.MIC, sampleRate,
             AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
             maxOf(minBuf, 8192))
+        if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+            events.error("init", "AudioRecord failed to initialize", null)
+            audioRecord?.release()
+            audioRecord = null
+            return
+        }
         audioRecord?.startRecording()
+        // Signal Dart that mic is ready
+        try { events.success("ready") } catch (_: Exception) {}
         pcmThread = Thread {
             val buf = ByteArray(3200)
             while (!Thread.currentThread().isInterrupted) {

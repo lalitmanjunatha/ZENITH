@@ -22,16 +22,25 @@ class WhisperService {
   final List<int> _buffer = [];
   bool _recording = false;
   String? lastError;
+  Function(String error)? onError;
 
   bool get isRecording => _recording;
   int get bufferMs => (_buffer.length ~/ (_sampleRate * 2)) * 1000;
 
-  void startCapture() {
-    if (_recording) return;
+  Future<bool> startCapture() async {
+    if (_recording) return true;
     _buffer.clear();
+    lastError = null;
     _pcmSub?.cancel();
+    final completer = Completer<bool>();
     _pcmSub = _channel.receiveBroadcastStream({'sampleRate': _sampleRate}).listen(
       (data) {
+        // Kotlin sends "ready" string first, then Uint8List PCM chunks
+        if (data is String && data == 'ready') {
+          _recording = true;
+          if (!completer.isCompleted) completer.complete(true);
+          return;
+        }
         if (data is Uint8List) {
           _buffer.addAll(data);
         }
@@ -39,9 +48,22 @@ class WhisperService {
       onError: (e) {
         lastError = e.toString();
         _recording = false;
+        onError?.call(lastError!);
+        if (!completer.isCompleted) completer.complete(false);
+      },
+      onDone: () {
+        _recording = false;
       },
     );
-    _recording = true;
+    // Timeout in case Kotlin never responds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!completer.isCompleted) {
+        lastError = lastError ?? 'Mic init timed out';
+        _recording = false;
+        completer.complete(false);
+      }
+    });
+    return completer.future;
   }
 
   void stopCapture() {

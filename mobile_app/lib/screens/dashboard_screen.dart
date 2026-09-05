@@ -181,6 +181,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       ZenithToasts.info('Voice OFF', duration: const Duration(seconds: 2));
       return;
     }
+
+    // Request RECORD_AUDIO permission first
+    final granted = await _phone.requestPermissions(['android.permission.RECORD_AUDIO']);
+    if (!granted) {
+      ZenithToasts.error('Microphone permission denied', duration: const Duration(seconds: 3));
+      return;
+    }
+
     _listener.onStatus = (s) {
       if (mounted) setState(() => _voiceStatus = s);
     };
@@ -193,9 +201,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (!mounted) return;
       _onVoiceCommand(cmd);
     };
-    await _listener.start();
+    final started = await _listener.start();
     if (mounted) {
-      setState(() => _listeningOn = true);
+      setState(() => _listeningOn = started);
+      if (!started) {
+        ZenithToasts.error(_listener.lastError ?? 'Failed to start mic', duration: const Duration(seconds: 3));
+      }
     }
   }
 

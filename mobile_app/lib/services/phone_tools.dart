@@ -41,7 +41,7 @@ class PhoneTools {
 
   String _err(dynamic r) => r is Map ? (r['__error']?.toString() ?? '?') : '?';
 
-  Future<bool> _perms(List<String> wanted) async {
+  Future<bool> requestPermissions(List<String> wanted) async {
     final r = await _native('requestPermissions', {'permissions': wanted});
     if (r is Map && r['__error'] == null) {
       return r.values.whereType<bool>().every((g) => g);
@@ -183,7 +183,7 @@ class PhoneTools {
     if (number.isEmpty || body.isEmpty) {
       return 'Need a number and a message body';
     }
-    if (!await _perms(['android.permission.SEND_SMS'])) {
+    if (!await requestPermissions(['android.permission.SEND_SMS'])) {
       return 'SEND_SMS permission denied';
     }
     final r = await _native('sendSms', {'number': number, 'body': body});
@@ -191,7 +191,7 @@ class PhoneTools {
   }
 
   Future<String> _readSms() async {
-    if (!await _perms(['android.permission.READ_SMS'])) {
+    if (!await requestPermissions(['android.permission.READ_SMS'])) {
       return 'READ_SMS permission denied';
     }
     final r = await _native('readSms');
@@ -207,7 +207,7 @@ class PhoneTools {
   }
 
   Future<String> _callLog() async {
-    if (!await _perms(['android.permission.READ_CALL_LOG'])) {
+    if (!await requestPermissions(['android.permission.READ_CALL_LOG'])) {
       return 'READ_CALL_LOG permission denied';
     }
     final r = await _native('callLog');
@@ -277,7 +277,7 @@ class PhoneTools {
   }
 
   Future<String> _calendarAdd(Map<String, dynamic> args) async {
-    if (!await _perms(['android.permission.WRITE_CALENDAR'])) {
+    if (!await requestPermissions(['android.permission.WRITE_CALENDAR'])) {
       return 'WRITE_CALENDAR permission denied';
     }
     final title = args['title']?.toString() ?? 'ZENITH Event';
@@ -293,7 +293,7 @@ class PhoneTools {
   }
 
   Future<String> _calendarRead() async {
-    if (!await _perms(['android.permission.READ_CALENDAR'])) {
+    if (!await requestPermissions(['android.permission.READ_CALENDAR'])) {
       return 'READ_CALENDAR permission denied';
     }
     final r = await _native('readCalendar');
@@ -417,7 +417,7 @@ class PhoneTools {
   Future<String> _placeCall(String number) async {
     if (number.isEmpty) return 'Say which number to call';
     final uri = Uri(scheme: 'tel', path: number);
-    final granted = await _perms(['android.permission.CALL_PHONE']);
+    final granted = await requestPermissions(['android.permission.CALL_PHONE']);
     try {
       final ok = await launchUrl(uri,
           mode: LaunchMode.externalApplication);
@@ -430,7 +430,7 @@ class PhoneTools {
   }
 
   Future<String> _contacts(String query) async {
-    if (!await _perms(['android.permission.READ_CONTACTS'])) {
+    if (!await requestPermissions(['android.permission.READ_CONTACTS'])) {
       return 'READ_CONTACTS permission denied';
     }
     try {
@@ -531,7 +531,7 @@ class PhoneTools {
 
   Future<String> _recordNote(int seconds) async {
     try {
-      if (!await _perms(['android.permission.RECORD_AUDIO'])) {
+      if (!await requestPermissions(['android.permission.RECORD_AUDIO'])) {
         return 'Microphone permission denied';
       }
       final start = await _native('startAudioRec');

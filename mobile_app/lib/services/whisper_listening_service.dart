@@ -27,9 +27,8 @@ class WhisperListeningService {
 
   bool get isRunning => _running;
 
-  Future<void> start() async {
-    if (_running) return;
-    _running = true;
+  Future<bool> start() async {
+    if (_running) return true;
     _processingCommand = false;
     _awaitingCommand = false;
 
@@ -37,14 +36,20 @@ class WhisperListeningService {
     if (apiKey.isEmpty) {
       lastError = 'Groq API key not configured';
       onStatus?.call(lastError!);
-      _running = false;
-      return;
+      return false;
     }
 
-    _whisper.startCapture();
-    onStatus?.call('Listening...');
+    final started = await _whisper.startCapture();
+    if (!started) {
+      lastError = _whisper.lastError ?? 'Mic access denied — grant RECORD_AUDIO permission';
+      onStatus?.call(lastError!);
+      return false;
+    }
 
+    _running = true;
+    onStatus?.call('Listening...');
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _poll(apiKey));
+    return true;
   }
 
   void stop() {

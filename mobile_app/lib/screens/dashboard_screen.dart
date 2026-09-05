@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../theme/jarvis_theme.dart';
 import '../services/bridge_service.dart';
-import '../services/always_listening_service.dart';
+import '../services/whisper_listening_service.dart';
 import '../services/phone_tools.dart';
 import '../widgets/toast_host.dart';
 
@@ -21,7 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   StreamSubscription? _statusSub;
   Map<String, dynamic>? stats;
   final PhoneTools _phone = PhoneTools();
-  final AlwaysListeningService _listener = AlwaysListeningService();
+  final WhisperListeningService _listener = WhisperListeningService();
   bool _listeningOn = false;
   String _voiceStatus = '';
 
@@ -178,12 +178,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_listeningOn) {
       _listener.stop();
       setState(() { _listeningOn = false; _voiceStatus = ''; });
-      ZenithToasts.info('Always-listening OFF', duration: const Duration(seconds: 2));
-      return;
-    }
-    final ok = await _listener.init();
-    if (!ok) {
-      ZenithToasts.error(_listener.lastError ?? 'Speech recognition unavailable.');
+      ZenithToasts.info('Voice OFF', duration: const Duration(seconds: 2));
       return;
     }
     _listener.onStatus = (s) {
@@ -198,11 +193,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (!mounted) return;
       _onVoiceCommand(cmd);
     };
-    _listener.start();
+    await _listener.start();
     if (mounted) {
       setState(() => _listeningOn = true);
-      ZenithToasts.success('Always-listening ON — say "ZENITH" anytime.',
-          duration: const Duration(seconds: 3));
     }
   }
 

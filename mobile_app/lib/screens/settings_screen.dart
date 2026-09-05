@@ -16,7 +16,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _cloudUrlController = TextEditingController();
   final _pinController = TextEditingController();
   final _hostController = TextEditingController();
-  final _groqKeyController = TextEditingController();
   bool _useCloud = true;
   String _savedMsg = '';
 
@@ -34,7 +33,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           prefs.getString('zenith_cloud_url') ?? 'https://zenith-cloud-brain.onrender.com';
       _pinController.text = prefs.getString('zenith_pin') ?? '';
       _hostController.text = prefs.getString('laptop_host') ?? '';
-      _groqKeyController.text = prefs.getString('groq_api_key') ?? '';
     });
   }
 
@@ -46,7 +44,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setBool('zenith_use_cloud', _useCloud);
     await prefs.setString('zenith_cloud_url', url);
     await prefs.setString('zenith_pin', pinVal);
-    await prefs.setString('groq_api_key', _groqKeyController.text.trim());
     if (host.isNotEmpty) {
       await prefs.setString('laptop_host', host);
       widget.bridge.host = host;
@@ -152,36 +149,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(color: JTheme.textPrimary, fontSize: 14),
                   decoration: InputDecoration(hintText: '192.168.1.100'),
                 ),
-              ],
-            ),
-          ),
-          SizedBox(height: 24),
-          Text('VOICE RECOGNITION',
-              style: TextStyle(
-                  color: JTheme.textMuted, fontSize: 11, letterSpacing: 1.5)),
-          SizedBox(height: 12),
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: JTheme.glassCard(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Groq API Key (for Whisper voice recognition)',
-                    style: TextStyle(color: JTheme.textSecondary, fontSize: 12)),
-                SizedBox(height: 8),
-                TextField(
-                  controller: _groqKeyController,
-                  obscureText: true,
-                  style: TextStyle(color: JTheme.textPrimary, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'gsk_...',
-                    hintStyle: TextStyle(fontSize: 12),
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text('Used for real-time voice recognition via Groq Whisper. '
-                    'Get your key at console.groq.com',
-                    style: TextStyle(color: JTheme.textMuted, fontSize: 10)),
               ],
             ),
           ),

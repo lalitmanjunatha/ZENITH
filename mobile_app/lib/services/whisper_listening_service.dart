@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../secrets.dart';
 import 'whisper_service.dart';
 
 /// Always-on voice listener using raw PCM audio + Groq Whisper.
@@ -33,9 +33,9 @@ class WhisperListeningService {
     _processingCommand = false;
     _awaitingCommand = false;
 
-    final apiKey = await _getApiKey();
+    final apiKey = Secrets.groqApiKey;
     if (apiKey.isEmpty) {
-      lastError = 'Set GROQ_API_KEY in Settings';
+      lastError = 'Groq API key not configured';
       onStatus?.call(lastError!);
       _running = false;
       return;
@@ -44,7 +44,6 @@ class WhisperListeningService {
     _whisper.startCapture();
     onStatus?.call('Listening...');
 
-    // Poll every 4 seconds — check if there's enough audio to transcribe
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _poll(apiKey));
   }
 
@@ -60,7 +59,7 @@ class WhisperListeningService {
 
   Future<void> _poll(String apiKey) async {
     if (!_running || _processingCommand) return;
-    if (_whisper.bufferMs < 2000) return; // need at least 2s of audio
+    if (_whisper.bufferMs < 2000) return;
 
     onStatus?.call('Transcribing...');
     final text = await _whisper.transcribe(apiKey);
@@ -69,7 +68,6 @@ class WhisperListeningService {
     final lower = text.toLowerCase();
     onStatus?.call('Heard: "$text"');
 
-    // If awaiting command after "zenith" alone
     if (_awaitingCommand) {
       _awaitingCommand = false;
       _awaitTimer?.cancel();
@@ -78,7 +76,6 @@ class WhisperListeningService {
       return;
     }
 
-    // Check for wake word
     if (lower.contains('zenith') || lower.contains('hey zenith')) {
       String command = text;
       final heyIdx = lower.indexOf('hey zenith');
@@ -109,10 +106,5 @@ class WhisperListeningService {
   void onCommandProcessed() {
     _processingCommand = false;
     onStatus?.call('Listening...');
-  }
-
-  Future<String> _getApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('groq_api_key') ?? '';
   }
 }

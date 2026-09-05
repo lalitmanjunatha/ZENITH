@@ -111,6 +111,7 @@ class MainActivity : FlutterActivity() {
 
     private var audioRecord: AudioRecord? = null
     private var pcmThread: Thread? = null
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     @Suppress("MissingPermission")
     private fun startPcm(sampleRate: Int, events: EventChannel.EventSink) {
@@ -134,8 +135,8 @@ class MainActivity : FlutterActivity() {
             return
         }
         audioRecord?.startRecording()
-        // Signal Dart that mic is ready
-        try { events.success("ready") } catch (_: Exception) {}
+        // Signal Dart that mic is ready (on main thread)
+        mainHandler.post { try { events.success("ready") } catch (_: Exception) {} }
         pcmThread = Thread {
             val buf = ByteArray(3200)
             while (!Thread.currentThread().isInterrupted) {
@@ -143,10 +144,10 @@ class MainActivity : FlutterActivity() {
                 if (rec.recordingState != AudioRecord.RECORDSTATE_RECORDING) break
                 val n = rec.read(buf, 0, buf.size)
                 if (n <= 0) break
-                try {
-                    events.success(java.util.Arrays.copyOf(buf, n))
-                } catch (_: Exception) {
-                    break
+                val chunk = java.util.Arrays.copyOf(buf, n)
+                // Post to main thread — EventChannel.EventSink is NOT thread-safe
+                mainHandler.post {
+                    try { events.success(chunk) } catch (_: Exception) {}
                 }
             }
         }.also { it.start() }

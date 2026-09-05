@@ -1,13 +1,9 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../secrets.dart';
 import 'whisper_service.dart';
 
 /// Always-on voice listener using raw PCM audio + Groq Whisper.
-/// NO speech_to_text — NO system chime — NO session restarts — NO loops.
-///
-/// Architecture:
-///   Kotlin AudioRecord → PCM stream (EventChannel) → buffer 4s of audio
-///   → send to Groq Whisper API → get text → check for "ZENITH" wake word.
 class WhisperListeningService {
   static final WhisperListeningService _i = WhisperListeningService._();
   factory WhisperListeningService() => _i;
@@ -17,8 +13,10 @@ class WhisperListeningService {
   bool _running = false;
   bool _processingCommand = false;
   bool _awaitingCommand = false;
+  bool _inCooldown = false;
   Timer? _pollTimer;
   Timer? _awaitTimer;
+  Timer? _cooldownTimer;
   String? lastError;
 
   Function(String command)? onCommand;
@@ -31,6 +29,7 @@ class WhisperListeningService {
     if (_running) return true;
     _processingCommand = false;
     _awaitingCommand = false;
+    _inCooldown = false;
 
     final apiKey = Secrets.groqApiKey;
     if (apiKey.isEmpty) {
@@ -41,7 +40,7 @@ class WhisperListeningService {
 
     final started = await _whisper.startCapture();
     if (!started) {
-      lastError = _whisper.lastError ?? 'Mic access denied — grant RECORD_AUDIO permission';
+      lastError = _whisper.lastError ?? 'Mic access denied';
       onStatus?.call(lastError!);
       return false;
     }
@@ -56,18 +55,23 @@ class WhisperListeningService {
     _running = false;
     _processingCommand = false;
     _awaitingCommand = false;
+    _inCooldown = false;
     _pollTimer?.cancel();
     _awaitTimer?.cancel();
+    _cooldownTimer?.cancel();
     _whisper.stopCapture();
     onStatus?.call('OFF');
   }
 
   Future<void> _poll(String apiKey) async {
-    if (!_running || _processingCommand) return;
-    if (_whisper.bufferMs < 2000) return;
+    if (!_running || _processingCommand || _inCooldown) return;
+    final bufMs = _whisper.bufferMs;
+    debugPrint('[LISTENER] Poll: bufferMs=$bufMs');
+    if (bufMs < 2000) return;
 
     onStatus?.call('Transcribing...');
     final text = await _whisper.transcribe(apiKey);
+    debugPrint('[LISTENER] Transcribe result: "$text"');
     if (text.isEmpty || !_running) return;
 
     final lower = text.toLowerCase();
@@ -77,6 +81,8 @@ class WhisperListeningService {
       _awaitingCommand = false;
       _awaitTimer?.cancel();
       _processingCommand = true;
+      _whisper.flushBuffer();
+      debugPrint('[LISTENER] Sending awaited command: "$text"');
       onCommand?.call(text);
       return;
     }
@@ -91,8 +97,10 @@ class WhisperListeningService {
         command = text.substring(zIdx + 'zenith'.length).trim();
       }
 
+      debugPrint('[LISTENER] Wake word found, command: "$command"');
       if (command.isNotEmpty) {
         _processingCommand = true;
+        _whisper.flushBuffer();
         onCommand?.call(command);
       } else {
         _awaitingCommand = true;
@@ -110,6 +118,15 @@ class WhisperListeningService {
 
   void onCommandProcessed() {
     _processingCommand = false;
-    onStatus?.call('Listening...');
+    _whisper.flushBuffer();
+    _inCooldown = true;
+    _cooldownTimer?.cancel();
+    onStatus?.call('Processing reply...');
+    // 7s cooldown: blocks polling while TTS speaks the brain reply
+    _cooldownTimer = Timer(const Duration(seconds: 7), () {
+      _inCooldown = false;
+      _whisper.flushBuffer();
+      if (_running) onStatus?.call('Listening...');
+    });
   }
 }

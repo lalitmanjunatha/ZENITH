@@ -80,14 +80,6 @@ async def catch_me_up() -> str:
         sections.append(s)
 
     try:
-        from Tools.dream_mode import latest_dream_brief_line
-        line = latest_dream_brief_line()
-        if line:
-            sections.append("🌙 " + line)
-    except Exception:
-        pass
-
-    try:
         from Tools.time_capsule import newly_unlocked_brief_line
         line = newly_unlocked_brief_line()
         if line:

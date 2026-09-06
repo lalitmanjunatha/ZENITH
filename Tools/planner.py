@@ -33,8 +33,6 @@ def _tool_registry() -> dict:
 
     load("Tools.memory_tools", "recall_memory", "what_do_you_remember",
          "get_memory_stats", "train_from_conversations", "store_memory", "memory_status")
-    load("Tools.knowledge_search", "search_knowledge", "ask_about_my_data", "index_files")
-    load("Tools.data_tools", "get_knowledge_stats", "search_my_files", "analyze_dataset")
     load("Tools.news_provider", "get_top_news")
     load("Tools.search_web", "search_web")
     load("Tools.self_edit", "read_source_file")
@@ -115,8 +113,7 @@ async def execute_goal(goal: str, max_steps: int = 8) -> str:
         'reply {"done":true,"tool":null,"params":{}}. Never return prose.'
     )
     tools_desc = (
-        "Choose from: search_web(query), search_knowledge(query), "
-        "ask_about_my_data(question), get_knowledge_stats(), search_my_files(query), "
+        "Choose from: search_web(query), "
         "get_top_news(), get_memory_stats(), recall_memory(query), "
         "what_do_you_remember(), get_time(), read_source_file(file_path).\n"
     )

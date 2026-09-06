@@ -73,17 +73,6 @@ async def what_do_you_remember() -> str:
 
 
 @function_tool()
-async def train_from_conversations() -> str:
-    """Train the memory index from all conversations and facts so far."""
-    try:
-        mem = _get_memory()
-        result = mem.train_from_conversations()
-        return json.dumps(result, indent=2, default=str)
-    except Exception as e:
-        return f"Training failed: {e}"
-
-
-@function_tool()
 async def get_memory_stats() -> str:
     """Return statistics about stored memory (messages, facts, vectors)."""
     try:

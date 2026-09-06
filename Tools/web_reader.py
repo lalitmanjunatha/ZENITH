@@ -123,20 +123,9 @@ async def save_article_as_pdf(url: str, index_into_knowledge: bool = True) -> st
                     "Try a reader-mode friendly source.")
         path = await __import__("asyncio").to_thread(_to_pdf, title or url, body, url)
 
-        indexed = False
-        if index_into_knowledge:
-            try:
-                from Tools.knowledge_search import index_files
-                res = await index_files(directory=str(path.parent))
-                indexed = "error" not in str(res).lower()
-            except Exception as e:
-                logger.debug(f"RAG index failed: {e}")
-
         from Tools.autonomy import journal
         journal("cleanup", f"Saved article PDF '{title[:60]}' ({words} words)")
         return (f"📄 ARTICLE SAVED → {path}\n"
-                f"   📛 {title}\n   ✍️ {words} words, ads stripped\n"
-                + ("🧠 Indexed into knowledge base — just ask me about it later."
-                   if indexed else "ℹ️ Knowledge indexing skipped/failed."))
+                f"   📛 {title}\n   ✍️ {words} words, ads stripped")
     except Exception as e:
         return f"❌ Reader-PDF failed: {e}"

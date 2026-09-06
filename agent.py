@@ -131,8 +131,6 @@ from Tools.sih_tools import (  # SIH SUBSYSTEMS
 )
 from Tools.laptop_health import get_laptop_health, predict_storage, run_health_snapshot
 from Tools.file_janitor import scan_cleanup_candidates, execute_cleanup  # FILE JANITOR
-from Tools.dream_mode import dream_now, dream_status, last_dream_summary  # DREAM MODE
-
 # ============ NEW BATCH: CONTEXT / COMMS / EXPLAINER / FUN / DOCTOR ============
 from Tools.context_engine import (
     wifi_profile, set_wifi_profile, app_usage_report,
@@ -181,10 +179,6 @@ from Tools.autonomy import (
     undo_last_actions, decide_and_act, run_daily_digest,
 )
 from Tools.missions import catch_me_up, daily_threat_board, cue_music, power_check
-from Tools.face_recognition import (
-    enroll_person, add_person_photo, list_known_people, remove_person,
-    run_facial_recognition, open_people_directory,
-)
 from Tools.call_butler import (
     butler_loop, set_session as butler_set_session, note_transcript,
     connect_me_to_caller, let_ai_handle_call, decline_this_call, recent_calls,
@@ -228,36 +222,10 @@ from Tools.phone_control import (
     phone_notify, phone_status,
 )
 from Tools.spotify import open_spotify,spotify_next,spotify_previous,spotify_play_song,spotify_play_liked,spotify_pause
-from Tools.ml_tools import (
-    train_classification_model,
-    train_regression_model,
-    cluster_data,
-    detect_anomalies,
-    analyze_data,
-)
-from Tools.nlp_tools import (
-    analyze_sentiment,
-    extract_entities,
-    summarize_text,
-    detect_language,
-    preprocess_text,
-)
-from Tools.data_tools import (
-    index_my_files,
-    search_my_files,
-    get_knowledge_stats,
-    analyze_dataset,
-)
-from Tools.knowledge_search import (
-    search_knowledge,
-    index_files,
-    ask_about_my_data,
-)
 from Tools.memory_tools import (
     store_memory,
     recall_memory,
     what_do_you_remember,
-    train_from_conversations,
     get_memory_stats,
 )
 from Tools.self_edit import modify_source_file, read_source_file
@@ -353,27 +321,9 @@ class UltimateAdvancedZenith(Agent):
                 spotify_play_song,
                 spotify_play_liked,
                 spotify_pause,
-                train_classification_model,
-                train_regression_model,
-                cluster_data,
-                detect_anomalies,
-                analyze_data,
-                analyze_sentiment,
-                extract_entities,
-                summarize_text,
-                detect_language,
-                preprocess_text,
-                index_my_files,
-                search_my_files,
-                get_knowledge_stats,
-                analyze_dataset,
-                search_knowledge,
-                index_files,
-                ask_about_my_data,
                 store_memory,
                 recall_memory,
                 what_do_you_remember,
-                train_from_conversations,
                 get_memory_stats,
                 modify_source_file,
                 read_source_file,
@@ -424,11 +374,6 @@ class UltimateAdvancedZenith(Agent):
                 # ============ FUTURISTIC: FILE JANITOR ============
                 scan_cleanup_candidates,
                 execute_cleanup,
-
-                # ============ FUTURISTIC: DREAM MODE ============
-                dream_now,
-                dream_status,
-                last_dream_summary,
 
                 # ============ CONTEXT ENGINE (6, 10, 12) ============
                 wifi_profile,
@@ -520,14 +465,6 @@ class UltimateAdvancedZenith(Agent):
                 undo_last_actions,
                 decide_and_act,
                 run_daily_digest,
-
-                # ============ FACE RECOGNITION (D) ============
-                enroll_person,
-                add_person_photo,
-                list_known_people,
-                remove_person,
-                run_facial_recognition,
-                open_people_directory,
 
                 # ============ CALL BUTLER (G) ============
                 connect_me_to_caller,
@@ -714,13 +651,6 @@ class UltimateAdvancedZenith(Agent):
             USEFUL50_INSTRUCTION,
             "You have access to ALL system, voice, automation and reminder tools.",
             "Use tools aggressively when required.",
-            "You are ML/NLP/LLM-powered. You can train models, analyze data, process text, and search your personal knowledge base.",
-            "When asked about data analysis, use the ML tools (train_classification_model, train_regression_model, cluster_data, detect_anomalies, analyze_data).",
-            "When asked about text analysis, use the NLP tools (analyze_sentiment, extract_entities, summarize_text, detect_language, preprocess_text).",
-            "When asked about your personal files or knowledge, use the knowledge tools (search_knowledge, index_files, ask_about_my_data, index_my_files, search_my_files, get_knowledge_stats).",
-            "Always classify the user's intent as ML, NLP, RAG, file_open, or general LLM, and route to the appropriate tool.",
-            "If the user asks about personal data (Aadhaar, PAN, documents), search your indexed files by content and tell them what you found.",
-            "If the user asks to open a file, find it by content and open it using the file system.",
             "AUTO-COMMAND MATCHING: When the user's message relates to any tool's functionality, silently auto-execute the matching tool without announcing the tool name or internal module. Simply act and report the result naturally. Do NOT ask 'Do you want me to do that?' for tool-related commands — just execute them.",
         ])
 
@@ -824,10 +754,8 @@ async def entrypoint(ctx: agents.JobContext):
         instructions = SESSION_INSTRUCTION + "\n\n" + TELEPHONY_INSTRUCTION + "\n" + call_ctx
         print(f"📞 Call-aware session: {call_ctx.decode('utf-8') if isinstance(call_ctx, bytes) else call_ctx}")
 
-    asyncio.create_task(_auto_index_files(agent))
     asyncio.create_task(_scheduler_loop(agent, session))
     asyncio.create_task(_morning_brief(agent, session))
-    asyncio.create_task(_dream_loop(agent))
     asyncio.create_task(_context_loops())
     asyncio.create_task(_jarvis_loops(session))
 
@@ -858,18 +786,6 @@ async def entrypoint(ctx: agents.JobContext):
             )
         except Exception as e:
             print(f"⚠️ Memory consolidation failed: {e}")
-
-
-async def _dream_loop(agent):
-    """Dream Mode watchdog: every minute, dream if the user has been idle long enough."""
-    print("🌙 Dream Mode watchdog on")
-    from Tools.dream_mode import maybe_dream
-    while True:
-        try:
-            await maybe_dream(agent)
-        except Exception as e:
-            print(f"⚠️ Dream tick error: {e}")
-        await asyncio.sleep(60)
 
 
 async def _context_loops():
@@ -904,16 +820,13 @@ def _touch_activity():
 
 
 async def _jarvis_loops(session):
-    """Call Butler watcher + Autonomy initiative engine + wake-word daemon + laptop watcher."""
+    """Call Butler watcher + Autonomy initiative engine + laptop watcher."""
     from Tools.call_butler import butler_loop, set_session as cb_set_session
     from Tools.autonomy import initiative_loop
-    from Tools.wake_word_daemon import start_daemon
     from Tools.laptop_watcher import set_session as lw_set_session
 
     cb_set_session(session)
     lw_set_session(session)  # laptop watcher can announce transitions vocally
-    mode = start_daemon()
-    print(f"🎧 Wake-word daemon: {mode} (say 'Zenith' anytime)")
 
     async def initiative(session_):
         await initiative_loop(None)   # session passed via holder below
@@ -960,22 +873,10 @@ def _start_watchdog(session):
 
     async def watchdog():
         import time as _t
-        import os as _os
-        console_mode = "console" in sys.argv
         while True:
             await asyncio.sleep(15)
             try:
-                from Tools.wake_word_daemon import rescue_requested, clear_rescue, \
-                    launch_agent_console
                 idle = _t.time() - _last_activity["ts"]
-
-                if rescue_requested():
-                    print("🎧 Wake word detected — reviving Zenith…")
-                    clear_rescue()
-                    if console_mode:
-                        launch_agent_console()
-                        _os._exit(0)
-                    continue
 
                 # Stall cure #1: silent >90s → gentle self-ping proves life
                 if 90 < idle <= 300:
@@ -998,13 +899,7 @@ def _start_watchdog(session):
                 logger.debug(f"watchdog tick: {e}")
 
     def _recover(console_mode: bool):
-        from Tools.wake_word_daemon import launch_agent_console
-        print("🔁 Watchdog recovery: spawning fresh Zenith…")
-        if console_mode:
-            launch_agent_console()
-            _os = __import__("os")
-            _os._exit(0)
-        # worker mode: leave process alive (LiveKit supervisor handles jobs)
+        print("🔁 Watchdog recovery: refreshing session…")
 
     asyncio.create_task(watchdog())
     print("🛡️ Watchdog armed (idle-stall & dead-session auto-recovery)")
@@ -1102,14 +997,6 @@ async def _gather_brief(agent) -> str:
                 parts.append(f"You have {stats.get('facts',0)} stored facts and {stats.get('messages',0)} message memories.")
             except Exception:
                 pass
-        # Dream Mode morning digest — what Zenith learned while user was away
-        try:
-            from Tools.dream_mode import latest_dream_brief_line
-            line = latest_dream_brief_line()
-            if line:
-                parts.append(line)
-        except Exception:
-            pass
         # Time capsules that unlocked overnight
         try:
             from Tools.time_capsule import newly_unlocked_brief_line
@@ -1122,31 +1009,6 @@ async def _gather_brief(agent) -> str:
     except Exception as e:
         print(f"⚠️ Brief gather error: {e}")
         return ""
-
-
-def _run_light_index(agent):
-    """Run lightweight indexing in background - limits files to prevent
-    starving the voice agent of responsiveness."""
-    try:
-        brain = agent.brain
-        if not (brain and brain.rag_pipeline):
-            print("⚠️ RAG pipeline not available; skipping auto-index")
-            return
-
-        from whole_disk_indexer import WholeDiskIndexer
-
-        indexer = WholeDiskIndexer(
-            vector_store=brain.rag_pipeline.vector_store,
-            embedder=brain.rag_pipeline.embedder,
-            content_extractor=brain.rag_pipeline.content_extractor,
-            chunker=brain.rag_pipeline.chunker,
-        )
-        # LIMITED indexing: only 20 files per pass so voice agent stays responsive
-        # Indexing resumes automatically across passes/restarts via state file.
-        result = indexer.index_content(limit=20)
-        print(f"📁 Light index pass complete: {result}")
-    except Exception as e:
-        print(f"⚠️ Light index worker failed: {e}")
 
 
 async def _spawn_cloud_client():
@@ -1171,41 +1033,6 @@ async def _spawn_cloud_client():
         logger.error("Failed to start Zenith Cloud daemon: %s", e)
 
 
-async def _auto_index_files(agent):
-    await asyncio.sleep(10)
-    print("📁 Starting lightweight auto-index (press Ctrl+C to skip)...")
-    try:
-        await asyncio.to_thread(_run_light_index, agent)
-    except Exception as e:
-        print(f"⚠️ Auto-index failed: {e}")
-
-
-def _run_full_index(agent):
-    """Run the whole-laptop content scan on a background thread so the
-    voice agent stays fully responsive (commands + conversation) while
-    training proceeds."""
-    try:
-        brain = agent.brain
-        if not (brain and brain.rag_pipeline):
-            print("⚠️ RAG pipeline not available; skipping auto-index")
-            return
-
-        from whole_disk_indexer import WholeDiskIndexer
-
-        indexer = WholeDiskIndexer(
-            vector_store=brain.rag_pipeline.vector_store,
-            embedder=brain.rag_pipeline.embedder,
-            content_extractor=brain.rag_pipeline.content_extractor,
-            chunker=brain.rag_pipeline.chunker,
-        )
-        # Passes bounded so we never starve the audio/conversation; index
-        # resumes automatically across passes/restarts via state file.
-        result = indexer.index_content(limit=0)
-        print(f"📁 Auto-index pass complete: {result}")
-    except Exception as e:
-        print(f"⚠️ Auto-index worker failed: {e}")
-
-
 def _consolidate_memory(agent):
     """On shutdown, distill the session's conversation into durable facts."""
     try:
@@ -1224,7 +1051,6 @@ def _consolidate_memory(agent):
         except Exception:
             llm = None
         result = agent.memory.consolidate(llm)
-        agent.memory.flush_vectors()
         print(f"🧠 Memory consolidated: {result}")
     except Exception as e:
         print(f"⚠️ Consolidation error: {e}")

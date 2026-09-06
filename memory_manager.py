@@ -1,9 +1,7 @@
 """Persistent memory for Zenith.
 
-Stores every conversation exchange in SQLite and maintains a semantic
-vector index (data/memory_index.faiss) so past conversations and stored
-facts can be recalled by meaning. Designed to never raise on failure so
-the voice agent keeps working even if the embedding model is unavailable.
+Stores every conversation exchange in SQLite.
+Designed to never raise on failure so the voice agent keeps working.
 """
 
 import json
@@ -32,33 +30,18 @@ def _now() -> str:
 
 
 class MemoryManager:
-    def __init__(
-        self,
-        db_path: str = "data/zenith_memory.db",
-        index_path: str = "data/memory_index.faiss",
-        dimension: int = 384,
-    ):
+    def __init__(self, db_path: str = "data/zenith_memory.db"):
         self.db_path = db_path
-        self.index_path = index_path
-        self.dimension = dimension
         self._conn: Optional[sqlite3.Connection] = None
-        self._embedder = None
-        self._vector_store = None
         self._session_started = False
         self._conv_id: Optional[int] = None
-        self._pending_vectors = 0
-        self._save_threshold = 25
         self.paused = False
 
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._connect()
         self._init_schema()
         self._sih_init_schema()
-        self._init_embedding()
 
-    # ------------------------------------------------------------------
-    # DB plumbing
-    # ------------------------------------------------------------------
     def _connect(self) -> None:
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
@@ -96,50 +79,6 @@ class MemoryManager:
         self._conn.commit()
         self.paused = self._read_meta_bool("paused", False)
 
-    def _init_embedding(self) -> None:
-        try:
-            from embedder import Embedder
-            from vector_store import VectorStore
-
-            self._embedder = Embedder()
-            self.dimension = self._embedder.get_dimension()
-            self._vector_store = VectorStore(
-                index_path=self.index_path, dimension=self.dimension
-            )
-            self._vector_store.load()
-            self._vector_store.initialize()
-        except Exception as e:
-            logger.warning(f"Memory embedding unavailable: {e}")
-            self._embedder = None
-            self._vector_store = None
-
-    def _add_vector(self, text: str, meta: Dict[str, Any]) -> None:
-        if not self._embedder or not self._vector_store or not text:
-            return
-        try:
-            emb = self._embedder.embed_single(text)
-            if emb is None:
-                return
-            import numpy as np
-
-            self._vector_store.add(np.array([emb], dtype=np.float32), [meta], normalize=True)
-            self._pending_vectors += 1
-            if self._pending_vectors >= self._save_threshold:
-                self.flush_vectors()
-        except Exception as e:
-            logger.warning(f"add_vector failed: {e}")
-
-    def flush_vectors(self) -> None:
-        try:
-            if self._vector_store:
-                self._vector_store.save()
-            self._pending_vectors = 0
-        except Exception as e:
-            logger.warning(f"flush_vectors failed: {e}")
-
-    # ------------------------------------------------------------------
-    # Recording
-    # ------------------------------------------------------------------
     def ensure_session(self) -> None:
         if self._session_started:
             return
@@ -164,22 +103,7 @@ class MemoryManager:
                 "INSERT INTO messages (conv_id, role, text, created_at) VALUES (?, ?, ?, ?)",
                 (self._conv_id, role, str(text), _now()),
             )
-            msg_id = cur.lastrowid
             self._conn.commit()
-            if ephemeral:
-                # Keep a textual trace but keep it out of the semantic index.
-                return
-            self._add_vector(
-                str(text),
-                {
-                    "type": "message",
-                    "role": role,
-                    "content": str(text),
-                    "message_id": msg_id,
-                    "conv_id": self._conv_id,
-                    "created_at": _now(),
-                },
-            )
         except Exception as e:
             logger.warning(f"record_message failed: {e}")
 
@@ -215,12 +139,9 @@ class MemoryManager:
         return v.lower() in ("1", "true", "yes", "on")
 
     def forget_last(self) -> Dict[str, Any]:
-        """Remove the most recent stored message (used for 'don't remember that')."""
         try:
             cur = self._conn.cursor()
-            cur.execute(
-                "SELECT id FROM messages ORDER BY id DESC LIMIT 1"
-            )
+            cur.execute("SELECT id FROM messages ORDER BY id DESC LIMIT 1")
             row = cur.fetchone()
             if row:
                 cur.execute("DELETE FROM messages WHERE id = ?", (row["id"],))
@@ -252,53 +173,15 @@ class MemoryManager:
                     (str(content).strip(), category, source, _now()),
                 )
             self._conn.commit()
-            self._add_vector(
-                str(content).strip(),
-                {
-                    "type": "fact",
-                    "category": category,
-                    "content": str(content).strip(),
-                    "source": source,
-                    "created_at": _now(),
-                },
-            )
         except Exception as e:
             logger.warning(f"record_fact failed: {e}")
 
-    # ------------------------------------------------------------------
-    # Recall
-    # ------------------------------------------------------------------
     def recall(self, query: str, top_k: int = 5) -> Dict[str, Any]:
         return {
             "query": query,
-            "messages": self._recall_messages(query, top_k),
+            "messages": self._recent_messages(top_k),
             "facts": self._recall_facts(top_k),
         }
-
-    def _recall_messages(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        if self._embedder and self._vector_store:
-            try:
-                emb = self._embedder.embed_single(query)
-                if emb is not None:
-                    import numpy as np
-
-                    hits = self._vector_store.search(
-                        np.array([emb], dtype=np.float32), top_k=top_k
-                    )
-                    found = [
-                        {
-                            "content": h.get("content", ""),
-                            "role": h.get("role", "user"),
-                            "score": round(h.get("similarity_score", 0), 4),
-                        }
-                        for h in hits
-                        if h.get("type") == "message" and h.get("content")
-                    ]
-                    if found:
-                        return found
-            except Exception as e:
-                logger.warning(f"vector recall failed: {e}")
-        return self._recent_messages(top_k)
 
     def _recall_facts(self, top_k: int) -> List[Dict[str, Any]]:
         try:
@@ -353,35 +236,10 @@ class MemoryManager:
         except Exception:
             return []
 
-    # ------------------------------------------------------------------
-    # Training / consolidation
-    # ------------------------------------------------------------------
-    def train_from_conversations(self) -> Dict[str, Any]:
-        embedded = 0
-        for f in self.all_facts():
-            self._add_vector(
-                f["content"],
-                {
-                    "type": "fact",
-                    "category": f.get("category", "general"),
-                    "content": f["content"],
-                    "source": f.get("source", "user"),
-                },
-            )
-            embedded += 1
-        self.flush_vectors()
-        return {
-            "facts_embedded": embedded,
-            "facts": len(self.all_facts()),
-            "messages": self.count_messages(),
-            "vectors": self.vector_count(),
-            "status": "trained",
-        }
-
     def consolidate(self, llm) -> Dict[str, Any]:
         recent = self.recent_context(24)
         if not recent or llm is None:
-            return self.train_from_conversations()
+            return {"facts": len(self.all_facts()), "messages": self.count_messages(), "status": "consolidated"}
         try:
             prompt = (
                 "From the conversation below, extract concise durable facts the "
@@ -419,22 +277,11 @@ class MemoryManager:
             if line.strip()
         ]
 
-    # ------------------------------------------------------------------
-    # Stats / misc
-    # ------------------------------------------------------------------
     def count_messages(self) -> int:
         try:
             cur = self._conn.cursor()
             cur.execute("SELECT COUNT(*) AS c FROM messages")
             return cur.fetchone()["c"]
-        except Exception:
-            return 0
-
-    def vector_count(self) -> int:
-        try:
-            if self._vector_store and self._vector_store.index:
-                return self._vector_store.index.ntotal
-            return 0
         except Exception:
             return 0
 
@@ -451,14 +298,12 @@ class MemoryManager:
                 "messages": messages,
                 "conversations": conversations,
                 "facts": facts,
-                "vectors": self.vector_count(),
                 "db_path": self.db_path,
             }
         except Exception as e:
             return {"error": str(e)}
 
     def _sih_init_schema(self) -> None:
-        """Initialize SIH project tables if they don't exist."""
         cur = self._conn.cursor()
         cur.executescript(
             """
@@ -558,7 +403,6 @@ class MemoryManager:
         self._sih_migrate_columns()
 
     def _sih_migrate_columns(self) -> None:
-        """Add created_at to legacy SIH tables that lack it."""
         cur = self._conn.cursor()
         for table in ("sih_research", "sih_features", "sih_risks", "sih_evidence", "sih_architecture"):
             cur.execute(f"PRAGMA table_info({table})")
@@ -567,16 +411,10 @@ class MemoryManager:
                 try:
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN created_at TEXT")
                     self._conn.commit()
-                    logger.info(f"Migrated {table}: added created_at column")
-                except Exception as e:
-                    logger.warning(f"SIH migration failed for {table}: {e}")
+                except Exception:
+                    pass
 
     def close(self) -> None:
-        """Flush pending vectors and close the database connection."""
-        try:
-            self.flush_vectors()
-        except Exception:
-            pass
         try:
             if self._conn:
                 self._conn.close()
@@ -599,9 +437,6 @@ class MemoryManager:
             cur.execute("DELETE FROM sih_evidence")
             cur.execute("DELETE FROM sih_decisions")
             self._conn.commit()
-            if self._vector_store:
-                self._vector_store.reset()
-                self.flush_vectors()
             return {"status": "cleared"}
         except Exception:
             return {"status": "failed"}

@@ -260,7 +260,6 @@ AGENT_INSTRUCTION_FOR_TOOLS = """
 - scan_cleanup_candidates() / execute_cleanup() - disk cleanup
 - suggest_rename(path) / apply_rename() - file renaming
 - scan_old_files() / archive_old_files() - file archival
-- index_my_files() / search_my_files() - file indexing
 
 ### System Monitoring
 - get_laptop_health() - battery, disk, RAM, thermals
@@ -273,9 +272,6 @@ AGENT_INSTRUCTION_FOR_TOOLS = """
 - process_document_query(query) - PDF/document Q&A
 - create_excel_file() / save_excel_changes() - Excel automation
 - word_to_pdf() / image_to_pdf() / excel_to_pdf() / ppt_to_pdf()
-- analyze_sentiment(text) / extract_entities(text) / summarize_text(text)
-- train_classification_model() / cluster_data() / detect_anomalies()
-- search_knowledge(query) / index_files(dir) / ask_about_my_data(q)
 
 ### Vision
 - screen_short() - screenshot
@@ -306,7 +302,6 @@ AGENT_INSTRUCTION_FOR_TOOLS = """
 - build_boot_text() - startup greeting
 - catch_me_up() / daily_threat_board() / cue_music()
 - enable_guest_mode() / disable_guest_mode()
-- enroll_person(name) / run_facial_recognition()
 
 ### Privacy & Self-Edit
 - pause_memory() / resume_memory() / do_not_remember_that()
@@ -580,13 +575,6 @@ If during a handled call the caller claims URGENCY, immediately interrupt the
 owner: "<Name> insists it's urgent — shall I connect you?" and honor the reply.
 After an AI-handled call ends, deliver the compiled debrief naturally.
 
-## FACIAL RECOGNITION + PEOPLE WINDOW
-- "run facial recognition" -> run_facial_recognition (webcam scan + window opens;
-  recognized person's photo+details on top, whole gallery below)
-- "show me everyone you know" -> open_people_directory
-- enroll via enroll_person (webcam burst if no folder given) or add_person_photo;
-  remove_person to forget someone; list_known_people for a quick census.
-
 ## WAKE WORD
 The wake daemon listens for "Zenith". If the session ever feels dead/stuck,
 saying "Zenith" triggers instant revival (watchdog restart). Mention this once
@@ -690,10 +678,4 @@ FUTURISTIC_INSTRUCTION = """
 - Execute ONLY after user clearly confirms; always remind files move to
   ~/zenith_cleanup_staging (recoverable), never deleted.
 - If user says just "clean my files" without a fresh scan, scan first.
-
-## DREAM MODE (self-improvement while idle)
-- Runs automatically when user is idle 15+ min (cooldown 30 min).
-- "dream now" -> dream_now | "dream status" -> dream_status
-- "what did you learn while I was away" / "morning digest" -> last_dream_summary
-- Weave digest lines naturally into morning greetings when available.
 """

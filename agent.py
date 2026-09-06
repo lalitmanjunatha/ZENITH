@@ -91,7 +91,6 @@ from Tools.send_media_whatsapp import send_media_to_whatsapp
 from Tools.excel_data_entery  import create_excel_file,save_excel_changes,delete_all_data,move_left,move_up,enter_data_quick,enter_multiple_data_quick,move_down,move_right,delete_current_cell,go_to_cell,toggle_text_bold,select_row_or_column,sort_excel_data,excel_clipboard_action,calculate_sum
 from Tools.word_to_pdf  import word_to_pdf,image_to_pdf,excel_to_pdf,ppt_to_pdf,convert_image_format,test_converters
 from Tools.create_folder  import create_here
-from Tools.create_folder import create_here
 from Tools.read_screen_text import read_screen_text
 from Tools.camera_analysis import camera_analysis
 from Tools.screen_analyzer import analyze_screen

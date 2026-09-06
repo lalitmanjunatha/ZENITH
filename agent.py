@@ -701,8 +701,50 @@ class UltimateAdvancedZenith(Agent):
 # =========================
 # ENTRYPOINT
 # =========================
+
+def _select_working_mic():
+    """Auto-detect the microphone that actually captures audio."""
+    import sounddevice as sd
+    import numpy as np
+
+    devices = sd.query_devices()
+    default_in = sd.default.device[0]
+    candidates = []
+
+    for i, d in enumerate(devices):
+        if d["max_input_channels"] == 0:
+            continue
+        # Skip invalid sample rate devices
+        try:
+            info = sd.query_devices(i, "input")
+        except Exception:
+            continue
+        candidates.append(i)
+
+    # Quick-test each candidate with a 0.5s capture
+    for idx in candidates:
+        try:
+            sr = int(devices[idx]["default_samplerate"])
+            rec = sd.rec(int(0.5 * sr), samplerate=sr, channels=1, dtype="int16", device=idx)
+            sd.wait()
+            peak = np.max(np.abs(rec))
+            if peak > 50:  # actual audio detected
+                if idx != default_in:
+                    sd.default.device = (idx, sd.default.device[1])
+                    print(f"🎤 Auto-selected mic: [{idx}] {devices[idx]['name']} (peak={peak})")
+                else:
+                    print(f"🎤 Default mic OK: [{idx}] {devices[idx]['name']} (peak={peak})")
+                return
+        except Exception:
+            continue
+
+    print("⚠️ No working microphone found — audio may not work")
+
+
 async def entrypoint(ctx: agents.JobContext):
     print("🚀 Starting Zenith...")
+
+    _select_working_mic()
 
     agent = UltimateAdvancedZenith()
     session = AgentSession()

@@ -708,37 +708,41 @@ def _select_working_mic():
     import numpy as np
 
     devices = sd.query_devices()
-    default_in = sd.default.device[0]
     candidates = []
 
     for i, d in enumerate(devices):
         if d["max_input_channels"] == 0:
             continue
-        # Skip invalid sample rate devices
         try:
-            info = sd.query_devices(i, "input")
+            sd.query_devices(i, "input")
+            candidates.append(i)
         except Exception:
             continue
-        candidates.append(i)
 
-    # Quick-test each candidate with a 0.5s capture
+    best_idx = None
+    best_peak = 0
+
     for idx in candidates:
         try:
             sr = int(devices[idx]["default_samplerate"])
-            rec = sd.rec(int(0.5 * sr), samplerate=sr, channels=1, dtype="int16", device=idx)
+            rec = sd.rec(int(0.3 * sr), samplerate=sr, channels=1, dtype="int16", device=idx)
             sd.wait()
-            peak = np.max(np.abs(rec))
-            if peak > 50:  # actual audio detected
-                if idx != default_in:
-                    sd.default.device = (idx, sd.default.device[1])
-                    print(f"🎤 Auto-selected mic: [{idx}] {devices[idx]['name']} (peak={peak})")
-                else:
-                    print(f"🎤 Default mic OK: [{idx}] {devices[idx]['name']} (peak={peak})")
-                return
+            peak = int(np.max(np.abs(rec)))
+            name = devices[idx]["name"]
+            if peak > best_peak:
+                best_peak = peak
+                best_idx = idx
+            # Skip Stereo Mix (system loopback, not a real mic)
+            if "Stereo Mix" in name:
+                continue
         except Exception:
             continue
 
-    print("⚠️ No working microphone found — audio may not work")
+    if best_idx is not None and best_peak > 50:
+        sd.default.device = (best_idx, sd.default.device[1])
+        print(f"🎤 Auto-selected mic: [{best_idx}] {devices[best_idx]['name']} (peak={best_peak})")
+    else:
+        print("⚠️ No working microphone found — audio may not work")
 
 
 async def entrypoint(ctx: agents.JobContext):

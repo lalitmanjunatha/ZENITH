@@ -9,5 +9,7 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false
+      - key: XPL_API_KEY
+        sync: false
       - key: BRIDGE_PIN
         sync: false

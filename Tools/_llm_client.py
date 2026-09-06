@@ -1,11 +1,12 @@
 """Provider-agnostic LLM client for Zenith's code-editing and memory tools.
 
 Pick a provider with the ZENITH_LLM_PROVIDER env var:
-  groq (default), openai, google, mistral, nvidia
+  experiential (default), groq, openai, google, mistral, nvidia
 
 Each provider's API key is read from its standard env var
-(GROQ_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY / MISTRAL_API_KEY /
-NVIDIA_API_KEY). dotenv is loaded here so the module works standalone.
+(XPL_API_KEY / GROQ_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY /
+MISTRAL_API_KEY / NVIDIA_API_KEY). dotenv is loaded here so the module
+works standalone.
 """
 
 import asyncio
@@ -23,6 +24,11 @@ except Exception:
 logger = logging.getLogger(__name__)
 
 PROVIDERS = {
+    "experiential": {
+        "key": "XPL_API_KEY",
+        "base": "https://api.experientiallabs.ai/v1/chat/completions",
+        "model": os.getenv("XPL_MODEL", "gpt-6-astra"),
+    },
     "groq": {
         "key": "GROQ_API_KEY",
         "base": "https://api.groq.com/openai/v1/chat/completions",
@@ -50,7 +56,7 @@ PROVIDERS = {
     },
 }
 
-DEFAULT_PROVIDER = "groq"
+DEFAULT_PROVIDER = "experiential"
 
 
 def current_provider() -> str:
@@ -112,6 +118,7 @@ async def chat_complete(
     model: str = None,
     temperature: float = 0.2,
     max_tokens: int = 6000,
+    reasoning_effort: str = None,
 ) -> str:
     """Async completion over any supported provider. Returns text or 'ERROR: ...'."""
     pname = (provider or current_provider()).lower()
@@ -138,6 +145,8 @@ async def chat_complete(
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                 }
+                if reasoning_effort:
+                    body["reasoning_effort"] = reasoning_effort
             async with session.post(url, headers=headers, json=body, timeout=120) as res:
                 data = await res.json()
                 if res.status != 200:
@@ -155,6 +164,7 @@ def chat_complete_sync(
     model: str = None,
     temperature: float = 0.2,
     max_tokens: int = 2000,
+    reasoning_effort: str = None,
 ) -> str:
     """Synchronous completion (requests) — safe to call from a background thread."""
     import requests
@@ -183,6 +193,8 @@ def chat_complete_sync(
                 "temperature": temperature,
                 "max_tokens": max_tokens,
             }
+            if reasoning_effort:
+                body["reasoning_effort"] = reasoning_effort
         res = requests.post(url, headers=headers, json=body, timeout=90)
         if res.status_code != 200:
             return f"ERROR: {cfg['model']} API {res.status_code}: {res.text}"

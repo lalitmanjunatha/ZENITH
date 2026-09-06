@@ -20,9 +20,10 @@ from pydantic import BaseModel
 from registry import PHONE_TOOLS, prompt_block, tool_class
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+XPL_API_KEY = os.environ.get("XPL_API_KEY", "")
 BRIDGE_PIN = os.environ.get("BRIDGE_PIN", "")
-MODEL_PRIMARY = os.environ.get("ZENITH_MODEL", "openai/gpt-oss-120b")
-MODEL_FALLBACK = "openai/gpt-oss-20b"
+MODEL_PRIMARY = os.environ.get("ZENITH_MODEL", "gpt-6-astra")
+MODEL_FALLBACK = os.environ.get("ZENITH_MODEL_FALLBACK", "openai/gpt-oss-120b")
 CONFIRM_TTL = 60.0
 
 app = FastAPI(title="Zenith Cloud Brain")
@@ -75,11 +76,20 @@ async def dispatch(role: str, tool: str, args: dict, timeout: float = 30.0) -> d
     return result
 
 
-async def groq_chat(messages, model: str) -> str:
-    async with httpx.AsyncClient(timeout=40) as client:
+async def llm_chat(messages, model: str, provider: str = "experiential") -> str:
+    if provider == "experiential" and XPL_API_KEY:
+        api_key = XPL_API_KEY
+        base_url = "https://api.experientiallabs.ai/v1/chat/completions"
+    elif GROQ_API_KEY:
+        api_key = GROQ_API_KEY
+        base_url = "https://api.groq.com/openai/v1/chat/completions"
+    else:
+        raise RuntimeError("No LLM API key configured")
+
+    async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            base_url,
+            headers={"Authorization": f"Bearer {api_key}"},
             json={
                 "model": model,
                 "messages": messages,
@@ -165,22 +175,22 @@ async def tools():
 async def command(cmd: CommandIn):
     if not pin_ok(cmd.pin):
         raise HTTPException(401, "bad PIN")
-    if not GROQ_API_KEY:
-        return {"type": "text", "reply": "⚠️ GROQ_API_KEY not set on the server yet."}
+    if not GROQ_API_KEY and not XPL_API_KEY:
+        return {"type": "text", "reply": "⚠️ No LLM API key set on the server yet."}
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + cmd.history[-8:]
     messages.append({"role": "user", "content": cmd.command})
 
     decision = None
-    for model in (MODEL_PRIMARY, MODEL_FALLBACK):
+    for model, provider in ((MODEL_PRIMARY, "experiential"), (MODEL_FALLBACK, "groq")):
         try:
-            raw = await groq_chat(messages, model)
+            raw = await llm_chat(messages, model, provider)
             decision = parse_decision(raw)
             break
         except Exception:
             continue
     if decision is None:
-        return {"type": "text", "reply": "🧠 Brain hiccup — couldn't reach Groq. Try again."}
+        return {"type": "text", "reply": "🧠 Brain hiccup — couldn't reach LLM. Try again."}
 
     tool = decision.get("tool")
     args = decision.get("args") or {}

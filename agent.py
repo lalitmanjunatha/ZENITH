@@ -703,46 +703,46 @@ class UltimateAdvancedZenith(Agent):
 # =========================
 
 def _select_working_mic():
-    """Auto-detect the microphone that actually captures audio."""
+    """Select the best working microphone."""
     import sounddevice as sd
     import numpy as np
 
-    devices = sd.query_devices()
-    candidates = []
+    # If user specified a device, use it
+    env_dev = os.environ.get("ZENITH_MIC_DEVICE", "").strip()
+    if env_dev.isdigit():
+        idx = int(env_dev)
+        sd.default.device = (idx, sd.default.device[1])
+        info = sd.query_devices(idx)
+        print(f"🎤 Using configured mic: [{idx}] {info['name']}")
+        return
 
-    for i, d in enumerate(devices):
-        if d["max_input_channels"] == 0:
-            continue
-        try:
-            sd.query_devices(i, "input")
-            candidates.append(i)
-        except Exception:
-            continue
+    devices = sd.query_devices()
+    skip_words = ["Stereo Mix", "Sound Mapper", "Primary Sound"]
 
     best_idx = None
     best_peak = 0
 
-    for idx in candidates:
-        name = devices[idx]["name"]
-        # Skip Stereo Mix (system loopback) and Microsoft Sound Mapper
-        if "Stereo Mix" in name or "Sound Mapper" in name or "Primary Sound" in name:
+    for i, d in enumerate(devices):
+        if d["max_input_channels"] == 0:
+            continue
+        name = d["name"]
+        if any(s.lower() in name.lower() for s in skip_words):
             continue
         try:
-            sr = int(devices[idx]["default_samplerate"])
-            rec = sd.rec(int(0.3 * sr), samplerate=sr, channels=1, dtype="int16", device=idx)
-            sd.wait()
+            sr = int(d["default_samplerate"])
+            rec = sd.rec(int(0.2 * sr), samplerate=sr, channels=1, dtype="int16", device=i, blocking=True)
             peak = int(np.max(np.abs(rec)))
             if peak > best_peak:
                 best_peak = peak
-                best_idx = idx
+                best_idx = i
         except Exception:
             continue
 
-    if best_idx is not None and best_peak > 50:
+    if best_idx is not None and best_peak > 100:
         sd.default.device = (best_idx, sd.default.device[1])
         print(f"🎤 Auto-selected mic: [{best_idx}] {devices[best_idx]['name']} (peak={best_peak})")
     else:
-        print("⚠️ No working microphone found — audio may not work")
+        print("⚠️ No working microphone found. Set ZENITH_MIC_DEVICE=<index> in .env")
 
 
 async def entrypoint(ctx: agents.JobContext):

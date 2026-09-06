@@ -723,18 +723,18 @@ def _select_working_mic():
     best_peak = 0
 
     for idx in candidates:
+        name = devices[idx]["name"]
+        # Skip Stereo Mix (system loopback) and Microsoft Sound Mapper
+        if "Stereo Mix" in name or "Sound Mapper" in name or "Primary Sound" in name:
+            continue
         try:
             sr = int(devices[idx]["default_samplerate"])
             rec = sd.rec(int(0.3 * sr), samplerate=sr, channels=1, dtype="int16", device=idx)
             sd.wait()
             peak = int(np.max(np.abs(rec)))
-            name = devices[idx]["name"]
             if peak > best_peak:
                 best_peak = peak
                 best_idx = idx
-            # Skip Stereo Mix (system loopback, not a real mic)
-            if "Stereo Mix" in name:
-                continue
         except Exception:
             continue
 

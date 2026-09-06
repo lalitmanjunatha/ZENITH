@@ -82,9 +82,9 @@ def _write_atomic(p: Path, content: str) -> None:
 
 def _log_edit(p: Path, description: str, ok: bool, detail: str) -> None:
     try:
-        from memory_manager import MemoryManager
+        from memory_manager import get_shared_memory
 
-        mem = MemoryManager()
+        mem = get_shared_memory()
         mem.record_fact(
             f"Self-edit {'SUCCESS' if ok else 'FAILED'} on {p.name}: {description}",
             category="self_edit",

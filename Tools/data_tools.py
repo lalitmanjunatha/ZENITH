@@ -6,57 +6,55 @@ import json
 
 logger = logging.getLogger(__name__)
 
+_shared_brain = None
+
+
+def _get_brain():
+    global _shared_brain
+    if _shared_brain is None:
+        from zenith_brain import ZenithBrain
+        _shared_brain = ZenithBrain()
+        _shared_brain.initialize()
+    return _shared_brain
+
 
 @function_tool()
 async def index_my_files(directory: str = None) -> str:
     try:
-        from zenith_brain import ZenithBrain
-
-        brain = ZenithBrain()
-        brain.initialize()
-
+        brain = _get_brain()
         if not brain.rag_pipeline:
-            return "❌ RAG pipeline not available"
+            return "RAG pipeline not available"
 
         scan_dir = directory or str(__import__("pathlib").Path.home() / "Documents")
         result = brain.rag_pipeline.index_directory(scan_dir)
 
         return json.dumps(result, indent=2, default=str)
     except Exception as e:
-        return f"❌ File indexing failed: {str(e)}"
+        return f"File indexing failed: {str(e)}"
 
 
 @function_tool()
 async def search_my_files(query: str, top_k: int = 5) -> str:
     try:
-        from zenith_brain import ZenithBrain
-
-        brain = ZenithBrain()
-        brain.initialize()
-
+        brain = _get_brain()
         if not brain.rag_pipeline:
-            return "❌ RAG pipeline not available"
+            return "RAG pipeline not available"
 
         result = brain.rag_pipeline.query(query, top_k=top_k)
 
         return json.dumps(result, indent=2, default=str)
     except Exception as e:
-        return f"❌ File search failed: {str(e)}"
+        return f"File search failed: {str(e)}"
 
 
 @function_tool()
 async def get_knowledge_stats() -> str:
     try:
-        from zenith_brain import ZenithBrain
-
-        brain = ZenithBrain()
-        brain.initialize()
-
+        brain = _get_brain()
         stats = brain.get_status()
-
         return json.dumps(stats, indent=2, default=str)
     except Exception as e:
-        return f"❌ Failed to get knowledge stats: {str(e)}"
+        return f"Failed to get knowledge stats: {str(e)}"
 
 
 @function_tool()

@@ -16,6 +16,16 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+_shared_memory = None
+
+
+def get_shared_memory():
+    """Return a shared MemoryManager singleton for all tools."""
+    global _shared_memory
+    if _shared_memory is None:
+        _shared_memory = MemoryManager()
+    return _shared_memory
+
 
 def _now() -> str:
     return datetime.now().isoformat()

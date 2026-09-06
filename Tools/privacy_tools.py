@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def _get_memory():
-    from memory_manager import MemoryManager
-    return MemoryManager()
+    from memory_manager import get_shared_memory
+    return get_shared_memory()
 
 
 @function_tool()

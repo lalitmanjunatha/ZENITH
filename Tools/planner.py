@@ -103,8 +103,8 @@ async def execute_goal(goal: str, max_steps: int = 8) -> str:
     """
     reg = _tool_registry()
     try:
-        from memory_manager import MemoryManager
-        mem = MemoryManager()
+        from memory_manager import get_shared_memory
+        mem = get_shared_memory()
     except Exception:
         mem = None
 

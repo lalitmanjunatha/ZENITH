@@ -598,7 +598,7 @@ class UltimateAdvancedZenith(Agent):
         if network_available:
             from google.genai import types as gemini_types
             return RealtimeModel(
-                model="gemini-2.5-flash-native-audio-preview-12-2025",
+                model="gemini-2.5-flash-native-audio-latest",
                 voice="Kore",
                 temperature=0.7,
                 language="en-US",

@@ -168,6 +168,8 @@ class ChatCLI:
 
         self._input_stream: sd.InputStream | None = None
         self._output_stream: sd.OutputStream | None = None
+        self._input_sample_rate: int = 24000
+        self._output_sample_rate: int = 24000
         self._cli_mode: Literal["text", "audio"] = "audio"
 
         self._text_input_buf: list[str] = []
@@ -287,13 +289,16 @@ class ChatCLI:
             assert isinstance(device_info, dict)
 
             self._input_device_name: str = device_info.get("name", "Microphone")
+            # Use device's native sample rate to avoid silent streams
+            native_sr = int(device_info.get("default_samplerate", 24000))
+            self._input_sample_rate = native_sr
             self._input_stream = sd.InputStream(
                 callback=self._sd_input_callback,
                 dtype="int16",
                 channels=1,
                 device=input_device,
-                samplerate=24000,
-                blocksize=2400,
+                samplerate=native_sr,
+                blocksize=native_sr // 100,  # ~10ms blocks
             )
             self._input_stream.start()
             self._session.input.audio = self._input_audio
@@ -308,13 +313,16 @@ class ChatCLI:
 
         _, output_device = sd.default.device
         if output_device is not None and enable:
+            device_info = sd.query_devices(output_device)
+            native_sr = int(device_info.get("default_samplerate", 24000))
+            self._output_sample_rate = native_sr
             self._output_stream = sd.OutputStream(
                 callback=self._sd_output_callback,
                 dtype="int16",
                 channels=1,
                 device=output_device,
-                samplerate=24000,
-                blocksize=2400,  # 100ms
+                samplerate=native_sr,
+                blocksize=native_sr // 100,  # ~10ms
             )
             self._output_stream.start()
             self._session.output.audio = self._output_audio
@@ -336,7 +344,8 @@ class ChatCLI:
     def _sd_output_callback(self, outdata: np.ndarray, frames: int, time, *_) -> None:  # type: ignore
         self._output_delay = time.outputBufferDacTime - time.currentTime
 
-        FRAME_SAMPLES = 240
+        sr = self._output_sample_rate
+        FRAME_SAMPLES = sr // 100
         with self._audio_sink.lock:
             bytes_needed = frames * 2
             if len(self._audio_sink.audio_buffer) < bytes_needed:
@@ -361,7 +370,7 @@ class ChatCLI:
             render_frame_for_aec = rtc.AudioFrame(
                 data=render_chunk.tobytes(),
                 samples_per_channel=FRAME_SAMPLES,
-                sample_rate=24000,
+                sample_rate=sr,
                 num_channels=1,
             )
             self._apm.process_reverse_stream(render_frame_for_aec)
@@ -375,7 +384,8 @@ class ChatCLI:
         except RuntimeError:
             pass  # setting stream delay in console mode fails often, so we silently continue
 
-        FRAME_SAMPLES = 240  # 10ms at 24000 Hz
+        sr = self._input_sample_rate
+        FRAME_SAMPLES = sr // 100  # 10ms frames
         num_frames = frame_count // FRAME_SAMPLES
 
         for i in range(num_frames):
@@ -386,7 +396,7 @@ class ChatCLI:
             capture_frame_for_aec = rtc.AudioFrame(
                 data=capture_chunk.tobytes(),
                 samples_per_channel=FRAME_SAMPLES,
-                sample_rate=24000,
+                sample_rate=sr,
                 num_channels=1,
             )
             self._apm.process_stream(capture_frame_for_aec)
